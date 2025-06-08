@@ -7,12 +7,14 @@ from typing import List, Dict, Any, Optional
 from langchain_core.documents import Document
 from langchain_core.vectorstores import VectorStore
 
-API_PINCONE_KEY = os.getenv("PINECONE_API_KEY")
+# Get environment variables
+PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
+PINECONE_INDEX_NAME = os.getenv("PINECONE_INDEX_NAME", "eduva")
 
 vector_store = PineconeVectorStore(
-    index_name="fpt-document",
+    index_name=PINECONE_INDEX_NAME,
     embedding=embeddings,
-    pinecone_api_key=API_PINCONE_KEY,
+    pinecone_api_key=PINECONE_API_KEY,
 )
 
 

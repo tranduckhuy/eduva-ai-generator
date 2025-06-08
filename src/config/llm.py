@@ -1,6 +1,11 @@
+import os
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_google_genai.embeddings import GoogleGenerativeAIEmbeddings
 from src.utils.logger import logger
+
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+DEFAULT_MODEL = os.getenv("DEFAULT_MODEL", "gemini-2.0-flash")
+TEMPERATURE = float(os.getenv("TEMPERATURE", "1.0"))
 
 # Default model instances
 llm_2_0 = ChatGoogleGenerativeAI(model="gemini-2.0-flash", temperature=1)
