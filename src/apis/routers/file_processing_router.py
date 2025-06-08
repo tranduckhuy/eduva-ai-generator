@@ -2,7 +2,12 @@ from fastapi import APIRouter, status, UploadFile, File
 from fastapi.responses import JSONResponse
 from src.utils.logger import logger
 
-from langchain_docling import DoclingLoader
+# Replace langchain_docling with document loaders from langchain-community
+from langchain_community.document_loaders import (
+    PyMuPDFLoader,
+    Docx2txtLoader,
+    UnstructuredFileLoader
+)
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 import os
 import tempfile
@@ -91,7 +96,16 @@ async def ingress_file(
         with open(temp_file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
 
-        loader = DoclingLoader(file_path=temp_file_path, export_type="markdown")
+        # Replace DoclingLoader with appropriate loader based on file type
+        file_extension = os.path.splitext(file.filename)[1].lower()
+        if file_extension == ".pdf":
+            loader = PyMuPDFLoader(temp_file_path)
+        elif file_extension == ".docx":
+            loader = Docx2txtLoader(temp_file_path)
+        else:
+            # Fallback to a generic loader for other file types
+            loader = UnstructuredFileLoader(temp_file_path)
+            
         docs = loader.load()
 
         splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
