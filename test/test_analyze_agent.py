@@ -137,4 +137,4 @@ Viết instruction hiệu quả giúp chatbot hoạt động mượt mà, chính
 
 """
 prompt = """"""
-analyze_prompt(prompt,criterion)
+# analyze_prompt(prompt,criterion)

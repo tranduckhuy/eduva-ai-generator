@@ -1,21 +1,24 @@
+# src/api/routers/file_processing_router.py
+
 from fastapi import APIRouter, status, UploadFile, File
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel, Field
 from src.utils.logger import logger
+from src.config.vector_store import vector_store
 
-# Replace langchain_docling with document loaders from langchain-community
-from langchain_community.document_loaders import (
-    PyMuPDFLoader,
-    Docx2txtLoader,
-    UnstructuredFileLoader
-)
-from langchain_text_splitters import RecursiveCharacterTextSplitter
 import os
 import tempfile
 import shutil
-import fitz
+import fitz  # PyMuPDF
 from docx import Document as DocxDoc
-from src.config.vector_store import vector_store
-from pydantic import BaseModel, Field
+
+# LangChain tools
+from langchain_community.document_loaders import (
+    PyMuPDFLoader,
+    Docx2txtLoader,
+    UnstructuredFileLoader,
+)
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 router = APIRouter(prefix="/file", tags=["File Processing"])
 
@@ -30,29 +33,33 @@ class FileIngressResponse(BaseModel):
 
 
 @router.post("/analyze")
-async def analyze_file(
-    file: UploadFile = File(...),
-):
+async def analyze_file(file: UploadFile = File(...)):
     try:
         temp_dir = tempfile.mkdtemp()
         temp_file_path = os.path.join(temp_dir, file.filename)
+
         with open(temp_file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
+
         file_extension = os.path.splitext(file.filename)[1].lower()
         file_type = file_extension.replace(".", "").upper()
+
         word_count = 0
         image_count = 0
+
         if file_extension == ".pdf":
             doc = fitz.open(temp_file_path)
-            for page in doc:
-                text = page.get_text("text")
-                word_count += len(text.split())
-                image_count += len(page.get_images(full=True))
+            try:
+                for page in doc:
+                    text = page.get_text("text")
+                    word_count += len(text.split())
+                    image_count += len(page.get_images(full=True))
+            finally:
+                doc.close()  # Ensure the PDF is properly closed
         elif file_extension == ".docx":
             doc = DocxDoc(temp_file_path)
             for para in doc.paragraphs:
                 word_count += len(para.text.split())
-            image_count = 0
             for rel in doc.part._rels.values():
                 if "image" in rel.target_ref:
                     image_count += 1
@@ -84,9 +91,7 @@ async def analyze_file(
 
 
 @router.post("/ingress", response_model=FileIngressResponse)
-async def ingress_file(
-    file: UploadFile = File(...),
-):
+async def ingress_file(file: UploadFile = File(...)):
     try:
         logger.info(f"Processing and indexing file: {file.filename}")
 
@@ -96,22 +101,22 @@ async def ingress_file(
         with open(temp_file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
 
-        # Replace DoclingLoader with appropriate loader based on file type
+        # Use appropriate loader
         file_extension = os.path.splitext(file.filename)[1].lower()
         if file_extension == ".pdf":
             loader = PyMuPDFLoader(temp_file_path)
         elif file_extension == ".docx":
             loader = Docx2txtLoader(temp_file_path)
         else:
-            # Fallback to a generic loader for other file types
             loader = UnstructuredFileLoader(temp_file_path)
-            
+
         docs = loader.load()
 
         splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
         chunks = splitter.split_documents(docs)
 
-        vector_store.add_documents(chunks)
+        # Add to vector store (async)
+        await vector_store.add_documents(chunks)
 
         shutil.rmtree(temp_dir)
         chunks_count = len(chunks)

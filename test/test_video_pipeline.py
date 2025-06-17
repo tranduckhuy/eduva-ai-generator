@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 from langchain_core.messages import HumanMessage
 
 load_dotenv()
-from src.agents.rag_agent_template.flow import rag_agent_template_agent
+from src.agents.lesson_creator.flow import lesson_creator_agent
 
 
 async def test_pipeline_integration():
@@ -41,7 +41,7 @@ async def test_pipeline_integration():
             config = {"configurable": {"thread_id": f"pipeline_test_{i}"}}
             input_dict = {"messages": [HumanMessage(content=test_case['query'])]}
             
-            response = await rag_agent_template_agent.ainvoke(input_dict, config)
+            response = await lesson_creator_agent.ainvoke(input_dict, config)
             
             # Step 2: Kiểm tra structured data
             print("📊 Step 2: Analyzing structured data...")
@@ -146,7 +146,7 @@ async def test_api_endpoints():
         config = {"configurable": {"thread_id": "api_test"}}
         input_dict = {"messages": [HumanMessage(content=test_query)]}
         
-        response = await rag_agent_template_agent.ainvoke(input_dict, config)
+        response = await lesson_creator_agent.ainvoke(input_dict, config)
         slide_data = response.get("slide_data", {})
         
         if slide_data:
@@ -192,7 +192,7 @@ async def demo_complete_pipeline():
         config = {"configurable": {"thread_id": "demo_pipeline"}}
         input_dict = {"messages": [HumanMessage(content=query)]}
         
-        response = await rag_agent_template_agent.ainvoke(input_dict, config)
+        response = await lesson_creator_agent.ainvoke(input_dict, config)
         slide_data = response.get("slide_data", {})
         
         if slide_data:
@@ -202,7 +202,7 @@ async def demo_complete_pipeline():
             
             # Step 3: Convert to RevealJS (simulate)
             print("\n🎬 Converting to RevealJS format...")
-            from src.apis.routers.rag_agent_template import convert_to_revealjs
+            from apis.routers.lesson_creator_router import convert_to_revealjs
             revealjs_html = convert_to_revealjs(slide_data)
             
             print("✅ RevealJS HTML generated")

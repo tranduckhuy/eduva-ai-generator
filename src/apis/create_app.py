@@ -1,6 +1,6 @@
 from fastapi import FastAPI, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
-from src.apis.routers.rag_agent_template import router as router_rag_agent_template
+from src.apis.routers.lesson_creator_router import router as router_rag_agent_template
 from src.apis.routers.file_processing_router import router as router_file_processing
 from src.apis.routers.vector_store_router import router as vector_store_router
 

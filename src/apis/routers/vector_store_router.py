@@ -9,13 +9,13 @@ router = APIRouter(prefix="/vector-store", tags=["Vector Store"])
 
 @router.get("/get-documents")
 async def get_documents():
-    documents = await vector_store.asimilarity_search("", 10000)
+    documents = await vector_store.get_documents()
     return [doc.__dict__ for doc in documents]
 
 
 @router.get("/search")
 async def search(query: str):
-    documents = await vector_store.asimilarity_search(query, 5)
+    documents = await vector_store.search(query)
     return [doc.__dict__ for doc in documents]
 
 
@@ -28,14 +28,21 @@ class AddDocumentsRequest(BaseModel):
 async def add_documents(
     body: AddDocumentsRequest,
 ):
-    return await vector_store.aadd_documents(body.documents, ids=body.ids)
+    await vector_store.add_documents(body.documents, ids=body.ids)
+    return {"message": "Documents added successfully"}
 
 
 @router.delete("/delete-documents")
 async def delete_documents(ids: List[str] = Query(None)):
-    document_data = await vector_store.asimilarity_search("", 10000)
-    document_ids = [doc.id for doc in document_data]
+    all_docs = await vector_store.get_documents()
+    all_ids = [doc.id for doc in all_docs]
+
+    # Nếu không truyền ids thì xóa hết
     if not ids:
-        ids = document_ids
-    delete_ids = [id for id in ids if id in document_ids]
-    return await vector_store.adelete(ids=delete_ids)
+        ids = all_ids
+
+    # Lọc ra những ID tồn tại
+    delete_ids = [id for id in ids if id in all_ids]
+
+    await vector_store.delete_documents(delete_ids)
+    return {"deleted_ids": delete_ids}

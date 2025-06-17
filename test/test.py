@@ -4,7 +4,7 @@ from langchain_core.messages import HumanMessage
 
 load_dotenv()
 # from src.agents.primary_chatbot.flow import lesson_plan_design_agent
-from src.agents.rag_agent_template.flow import rag_agent_template_agent
+from src.agents.lesson_creator.flow import lesson_creator_agent
 
 
 input_dict = {
@@ -26,7 +26,7 @@ async def main():
         else:
             human_message = "search db với 'kỳ co quy nhơn'"
         input_dict = {"messages": [HumanMessage(content=human_message)]}
-        response = await rag_agent_template_agent.ainvoke(input_dict, config)
+        response = await lesson_creator_agent.ainvoke(input_dict, config)
         print(response["messages"][-1].content)
         print("===============================================")
         count += 1

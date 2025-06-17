@@ -61,4 +61,4 @@ class RAGAgentTemplate:
         return self.builder.compile(checkpointer=InMemorySaver())
 
 
-rag_agent_template_agent = RAGAgentTemplate()()
+lesson_creator_agent = RAGAgentTemplate()()

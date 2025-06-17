@@ -3,7 +3,7 @@ from dotenv import load_dotenv
 from langchain_core.messages import HumanMessage
 
 load_dotenv()
-from src.agents.rag_agent_template.flow import rag_agent_template_agent
+from src.agents.lesson_creator.flow import lesson_creator_agent
 
 
 async def test_flexible_slide_creation():
@@ -43,7 +43,7 @@ async def test_flexible_slide_creation():
                 "messages": [HumanMessage(content=test_case['query'])]
             }
             
-            response = await rag_agent_template_agent.ainvoke(input_dict, config)
+            response = await lesson_creator_agent.ainvoke(input_dict, config)
             
             print("\n📋 Kết quả:")
             print("-" * 60)
@@ -94,7 +94,7 @@ async def test_specific_requirements():
                 "messages": [HumanMessage(content=test_case['query'])]
             }
             
-            response = await rag_agent_template_agent.ainvoke(input_dict, config)
+            response = await lesson_creator_agent.ainvoke(input_dict, config)
             result_content = response["messages"][-1].content
             
             # Phân tích kết quả
@@ -147,7 +147,7 @@ async def interactive_flexible_test():
             }
             
             print("\n🔄 Đang phân tích và tạo slide...")
-            response = await rag_agent_template_agent.ainvoke(input_dict, config)
+            response = await lesson_creator_agent.ainvoke(input_dict, config)
             result_content = response["messages"][-1].content
             
             # Đếm slide

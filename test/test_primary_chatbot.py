@@ -148,3 +148,6 @@
 #         asyncio.run(test_specific_node())
 #     else:
 #         print("Invalid choice. Please run again with a valid option.")
+
+# File này test cho primary chatbot không liên quan đến video lesson creator
+# Đã được comment out vì không cần thiết cho tính năng chính
