@@ -43,15 +43,21 @@ class RAGAgentTemplate:
         self.builder.add_edge("extract_slide_data", END)
 
     def extract_and_store_slide_data(self, state: State):
-        """Extract structured slide data from AI response"""
+        """Extract structured slide data from AI response and preserve RAG data"""
         messages = state["messages"]
         last_message = messages[-1]
 
         # Extract slide data from the response
         slide_data = extract_slide_data(last_message.content)
 
+        # Preserve RAG data from previous steps
+        selected_documents = state.get("selected_documents", [])
+        selected_ids = state.get("selected_ids", [])
+
         return {
-            "slide_data": slide_data
+            "slide_data": slide_data,
+            "selected_documents": selected_documents,
+            "selected_ids": selected_ids
         }
 
     def __call__(self) -> CompiledStateGraph:

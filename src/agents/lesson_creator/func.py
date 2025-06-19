@@ -49,19 +49,31 @@ def execute_tool(state: State):
     selected_ids = []
     selected_documents = []
     tool_messages = []
+    
+    logger.info(f"execute_tool called with {len(tool_calls)} tool calls")
+    
     for tool_call in tool_calls:
         tool_name = tool_call["name"]
         tool_args = tool_call["args"]
         tool_id = tool_call["id"]
+        
+        logger.info(f"Executing tool: {tool_name} with args: {tool_args}")
 
         tool_func = tool_name_to_func.get(tool_name)
         if tool_func:
             if tool_name == "retrieve_document":
+                query = tool_args.get("query", "")
+                logger.info(f"RAG Query: {query}")
+                
                 documents = tool_func.invoke(tool_args.get("query"))
                 documents = dict(documents)
                 context_str = documents.get("context_str", "")
                 selected_documents = documents.get("selected_documents", [])
                 selected_ids = documents.get("selected_ids", [])
+                
+                logger.info(f"RAG Result: {len(selected_documents)} documents found, {len(selected_ids)} IDs")
+                logger.info(f"Selected IDs: {selected_ids}")
+                
                 if documents:
                     tool_messages.append(
                         ToolMessage(
@@ -71,14 +83,15 @@ def execute_tool(state: State):
                     )
                 continue
             tool_response = tool_func.invoke(tool_args)
-            print(f"tool_response: {tool_response}")
+            logger.info(f"Tool {tool_name} response type: {type(tool_response)}")
             tool_messages.append(
                 ToolMessage(
                     tool_call_id=tool_id,
-                    content=tool_response,
+                    content=str(tool_response),
                 )
             )
 
+    logger.info(f"execute_tool returning: {len(selected_ids)} IDs, {len(selected_documents)} documents")
     return {
         "selected_ids": selected_ids,
         "selected_documents": selected_documents,
