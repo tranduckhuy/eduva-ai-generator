@@ -1,70 +1,81 @@
 from langgraph.graph import StateGraph, START, END
-from .func import (
-    State,
-    trim_history,
-    execute_tool,
-    generate_answer_rag,
-    extract_slide_data,
-)
-from langgraph.graph.state import CompiledStateGraph
-from langgraph.checkpoint.memory import InMemorySaver
+from langchain_core.messages import HumanMessage
+from .func import State, execute_tool, generate_slide_content, create_slide_data
+from src.utils.logger import logger
 
 
-class RAGAgentTemplate:
-    def __init__(self):
-        self.builder = StateGraph(State)
+def create_slide_workflow():
+    """Create a simple workflow for slide generation with RAG"""
 
-    @staticmethod
     def should_continue(state: State):
+        """Decide whether to continue with tool execution or generate final result"""
         messages = state["messages"]
         last_message = messages[-1]
-        if last_message.tool_calls:
+
+        # If last message has tool calls, execute them
+        if hasattr(last_message, "tool_calls") and last_message.tool_calls:
             return "execute_tool"
-        return "extract_slide_data"
+        # Otherwise, create slide data
+        return "create_slides"
 
-    def node(self):
-        self.builder.add_node("trim_history", trim_history)
-        self.builder.add_node("generate_answer_rag", generate_answer_rag)
-        self.builder.add_node("execute_tool", execute_tool)
-        self.builder.add_node("extract_slide_data", self.extract_and_store_slide_data)
-
-    def edge(self):
-        self.builder.add_edge(START, "trim_history")
-        self.builder.add_edge("trim_history", "generate_answer_rag")
-        self.builder.add_conditional_edges(
-            "generate_answer_rag",
-            self.should_continue,
-            {
-                "extract_slide_data": "extract_slide_data",
-                "execute_tool": "execute_tool",
-            },
-        )
-        self.builder.add_edge("execute_tool", "generate_answer_rag")
-        self.builder.add_edge("extract_slide_data", END)
-
-    def extract_and_store_slide_data(self, state: State):
-        """Extract structured slide data from AI response and preserve RAG data"""
+    def create_slides(state: State):
+        """Create final slide data from AI response"""
         messages = state["messages"]
         last_message = messages[-1]
 
-        # Extract slide data from the response
-        slide_data = extract_slide_data(last_message.content)
+        if hasattr(last_message, "content"):
+            slide_data = create_slide_data(last_message.content)
+            logger.info(
+                f"Created {slide_data.get('lesson_info', {}).get('slide_count', 0)} slides for high school students"
+            )
+            return {"slide_data": slide_data}
 
-        # Preserve RAG data from previous steps
-        selected_documents = state.get("selected_documents", [])
-        selected_ids = state.get("selected_ids", [])
+        return {"slide_data": None}
 
-        return {
-            "slide_data": slide_data,
-            "selected_documents": selected_documents,
-            "selected_ids": selected_ids
+    # Build the workflow
+    workflow = StateGraph(State)
+
+    # Add nodes
+    workflow.add_node("generate", generate_slide_content)
+    workflow.add_node("execute_tool", execute_tool)
+    workflow.add_node("create_slides", create_slides)
+
+    # Add edges
+    workflow.add_edge(START, "generate")
+    workflow.add_conditional_edges(
+        "generate",
+        should_continue,
+        {
+            "execute_tool": "execute_tool",
+            "create_slides": "create_slides",
+        },
+    )
+    workflow.add_edge("execute_tool", "generate")
+    workflow.add_edge("create_slides", END)
+
+    return workflow.compile()
+
+
+async def run_slide_creator(topic: str):
+    """Run the slide creator workflow for high school students"""
+    try:
+        workflow = create_slide_workflow()
+
+        initial_state = {
+            "messages": [HumanMessage(content=topic)],
+            "selected_documents": None,
+            "slide_data": None,
         }
 
-    def __call__(self) -> CompiledStateGraph:
-        self.node()
-        self.edge()
+        logger.info(f"Starting high school slide creation for topic: {topic}")
+        result = await workflow.ainvoke(initial_state)
 
-        return self.builder.compile(checkpointer=InMemorySaver())
+        return {
+            "success": True,
+            "slide_data": result.get("slide_data"),
+            "selected_documents": result.get("selected_documents", []),
+        }
 
-
-lesson_creator_agent = RAGAgentTemplate()()
+    except Exception as e:
+        logger.error(f"Error in high school slide creation: {e}")
+        return {"success": False, "error": str(e), "slide_data": None}
