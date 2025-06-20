@@ -74,67 +74,31 @@ YÊU CẦU IMAGE KEYWORDS:
 - NẾU có mâu thuẫn giữa file upload và vector store: LUÔN CHỌN FILE UPLOAD
 """
 
-# Simple prompt template without LangChain dependency
 def create_prompt_messages(system_prompt: str, user_messages: list):
-    """Create prompt messages without LangChain dependency"""
-    messages = [
-        {"role": "system", "content": system_prompt}
-    ]
+    """Create prompt messages"""
+    messages = [{"role": "system", "content": system_prompt}]
     
     for msg in user_messages:
         if hasattr(msg, 'content'):
-            # Handle LangChain message objects if they exist
             role = "user" if msg.__class__.__name__ == "HumanMessage" else "assistant"
             messages.append({"role": role, "content": msg.content})
         elif isinstance(msg, dict):
-            # Handle dict messages
             messages.append(msg)
         else:
-            # Handle string messages
             messages.append({"role": "user", "content": str(msg)})
     
     return messages
 
-def build_slide_creation_context(topic: str, uploaded_files_content: str = None, rag_context: str = None) -> str:
-    """
-    Xây dựng context hoàn chỉnh cho việc tạo slide
+
+def create_messages_for_llm(topic: str, uploaded_files_content: str = None, rag_context: str = None) -> list:
+    """Tạo messages cho LLM"""
+    context = f"Tạo slide về: {topic}\n\n"
     
-    Args:
-        topic: Chủ đề cần tạo slide
-        uploaded_files_content: Nội dung từ file upload (nếu có)
-        rag_context: Context từ vector store
-        
-    Returns:
-        str: Context hoàn chỉnh để gửi cho LLM
-    """
-    context = f"Tạo slide bài giảng cho học sinh cấp 3 về: {topic}\n\n"
-    
-    # Priority 1: File upload content (if exists)
     if uploaded_files_content and uploaded_files_content.strip():
-        context += f"NGUỒN CHÍNH - NỘI DUNG FILE UPLOAD (ƯU TIÊN SỬ DỤNG):\n{uploaded_files_content}\n\n"
+        context += f"NGUỒN CHÍNH - FILE UPLOAD:\n{uploaded_files_content}\n\n"
     
-    # Priority 2: Vector store documents
     if rag_context:
         context += f"NGUỒN PHỤ - TÀI LIỆU THAM KHẢO:\n{rag_context}\n\n"
     
-    return context
-
-def create_messages_for_llm(topic: str, uploaded_files_content: str = None, rag_context: str = None) -> list:
-    """
-    Tạo messages cho LLM sử dụng system prompt và context
-    
-    Args:
-        topic: Chủ đề cần tạo slide
-        uploaded_files_content: Nội dung từ file upload (nếu có)
-        rag_context: Context từ vector store
-        
-    Returns:
-        list: Messages formatted cho LLM
-    """
-    # Build user context
-    user_content = build_slide_creation_context(topic, uploaded_files_content, rag_context)
-    
-    # Use the existing create_prompt_messages function
-    user_messages = [{"role": "user", "content": user_content}]
-    
+    user_messages = [{"role": "user", "content": context}]
     return create_prompt_messages(system_prompt, user_messages)
