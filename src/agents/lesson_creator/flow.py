@@ -1,11 +1,11 @@
 from src.utils.logger import logger
 from .tools import retrieve_document
 from .func import create_slide_data, enhance_tts_script, generate_image_keywords
-from .cleaning import clean_all_slide_content
+from .prompt import create_messages_for_llm
 
 
 async def run_slide_creator(topic: str, uploaded_files_content: str = None, model_name: str = "gemini-2.0-flash"):
-    """Optimized slide creator without LangChain dependencies, with enhanced TTS and image keywords"""
+    """Optimized slide creator using centralized prompts, with enhanced TTS and image keywords"""
     try:
         logger.info(f"Creating slides for topic: {topic}")
         
@@ -18,94 +18,26 @@ async def run_slide_creator(topic: str, uploaded_files_content: str = None, mode
         
         logger.info(f"Retrieved {len(selected_documents)} documents from vector store")
         
-        # Step 2: Build comprehensive context with file upload priority
-        full_context = f"Tạo slide bài giảng cho học sinh cấp 3 về: {topic}\n\n"
+        # Step 2: Build messages using centralized prompts
+        logger.info("Step 2: Building context using centralized prompts...")
         
-        # Priority 1: File upload content (if exists)
-        if uploaded_files_content and uploaded_files_content.strip():
-            full_context += f"NGUỒN CHÍNH - NỘI DUNG FILE UPLOAD (ƯU TIÊN SỬ DỤNG):\n{uploaded_files_content}\n\n"
-            logger.info(f"Using uploaded file content: {len(uploaded_files_content)} chars")
+        prompt_messages = create_messages_for_llm(
+            topic=topic,
+            uploaded_files_content=uploaded_files_content,
+            rag_context=rag_context
+        )
         
-        # Priority 2: Vector store documents
-        if rag_context:
-            full_context += f"NGUỒN PHỤ - TÀI LIỆU THAM KHẢO:\n{rag_context}\n\n"
-        
-        # Step 3: Enhanced instructions for better TTS and image keywords
-        full_context += """
-YÊU CẦU TẠO SLIDE CHO HỌC SINH CẤP 3:
-
-1. NỘI DUNG - QUAN TRỌNG:
-   - NẾU CÓ FILE UPLOAD: Sử dụng 100% nội dung từ file làm chính, giữ nguyên mọi định nghĩa, khái niệm, ví dụ
-   - TUYỆT ĐỐI KHÔNG sửa đổi thuật ngữ khoa học từ file gốc
-   - Bổ sung từ vector store chỉ khi cần thiết
-   - KHÔNG BAO GIỜ dùng markdown: không có **, *, #, _, etc.
-   - Text thuần, rõ ràng, phù hợp độ tuổi 15-18
-
-2. TTS SCRIPT - CỰC KỲ QUAN TRỌNG:
-   - Độ dài: 150-300 từ mỗi slide (đủ dài để tạo audio hoàn chỉnh)
-   - HOÀN TOÀN SẠCH: không có \n, \t, **, *, _, #, hoặc bất kỳ ký tự đặc biệt nào
-   - Chỉ dùng text thuần như lời nói tự nhiên của giáo viên
-   - Giọng điệu: Thân thiện, nhiệt tình, dùng "các em", "chúng ta", "hãy cùng"
-   - Cấu trúc: Chào mừng -> Giải thích chi tiết -> Ví dụ từ tài liệu -> Chuyển tiếp
-
-3. IMAGE KEYWORDS - CỤ THỂ VÀ DỄ TÌM:
-   - Từ khóa tiếng Anh phổ biến trên stock photo sites
-   - Mô tả rõ ràng: "physics experiment setup" thay vì "physics"
-   - Context: "high school students", "classroom setting", "textbook illustration"
-   - 4-6 keywords từ chung đến cụ thể
-
-4. TÍCH HỢP FILE UPLOAD:
-   - Ưu tiên tuyệt đối nội dung từ file user upload
-   - Giữ nguyên cấu trúc bài học từ file
-   - Trích xuất trực tiếp định nghĩa, công thức, ví dụ từ file
-   - Không thay đổi hoặc diễn giải lại nội dung file gốc
-
-TRẢ VỀ JSON HOÀN TOÀN SẠCH:
-{
-  "lesson_info": {
-    "title": "Tiêu đề từ file upload hoặc topic - TEXT THUẦN",
-    "slide_count": số_slide_phù_hợp,
-    "target_level": "Cấp 3 (lớp 10-12)",
-    "subject": "Môn học từ file hoặc suy luận",
-    "estimated_duration_minutes": tổng_thời_gian,
-    "content_sources": ["file_upload ưu tiên", "vector_store phụ"],
-    "primary_source": "file_upload hoặc vector_store"
-  },
-  "slides": [
-    {
-      "slide_id": 1,
-      "type": "title|content|example|exercise",
-      "title": "Tiêu đề slide từ file - HOÀN TOÀN KHÔNG MARKDOWN",
-      "content": ["Bullet point 1 từ file - TEXT THUẦN", "Bullet point 2 từ file - TEXT THUẦN"],
-      "tts_script": "Script hoàn toàn sạch không có ký tự đặc biệt viết như giáo viên đang nói chuyện với học sinh một cách tự nhiên và thân thiện",
-      "image_keywords": ["specific visual concept", "high school classroom", "students engaged", "educational material"],
-      "source_references": ["File upload trang/phần X", "Vector store doc Y"],
-      "estimated_duration_seconds": 90
-    }
-  ]
-}
-
-LƯU Ý TUYỆT ĐỐI:
-- Nếu có công thức trong file: giữ nguyên hoàn toàn
-- Nếu có thuật ngữ chuyên môn: không thay đổi
-- TTS script: viết như đang nói, không có formatting
-- Content: text thuần, không bold, italic, header gì cả
-"""
-        
-        # Step 4: Call LLM to generate slides
+        # Step 3: Call LLM to generate slides
         from src.config.llm import get_llm
         llm = get_llm(model_name)
-        logger.info(f"Step 2: Generating slides with {model_name}...")
+        logger.info(f"Step 3: Generating slides with {model_name}...")
         
-        response = await llm.ainvoke([{"role": "user", "content": full_context}])
+        response = await llm.ainvoke(prompt_messages)
         
-        # Step 5: Parse and enhance response
+        # Step 4: Parse and enhance response
         slide_data = create_slide_data(response.content)
         
-        # Step 5.5: Clean all markdown and special characters from slide data
-        slide_data = clean_all_slide_content(slide_data)
-        
-        # Step 6: Post-process to ensure quality TTS and image keywords
+        # Step 5: Post-process to ensure quality TTS and image keywords
         if slide_data and "slides" in slide_data:
             for slide in slide_data["slides"]:
                 # Ensure TTS script is comprehensive

@@ -2,9 +2,18 @@ from fastapi import APIRouter, status, Form, UploadFile, File
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from typing import Optional, List
+import tempfile
+import os
 from src.agents.lesson_creator.flow import run_slide_creator
 from src.utils.logger import logger
 from src.utils.helper import preprocess_messages
+
+# Import proper document loaders
+from langchain_community.document_loaders import (
+    PyMuPDFLoader,
+    Docx2txtLoader,
+    TextLoader
+)
 
 router = APIRouter(prefix="/ai", tags=["AI"])
 
@@ -14,7 +23,7 @@ class SlideRequest(BaseModel):
 @router.post("/slide-creator")
 async def create_slides(
     topic: str = Form(..., description="Chủ đề cần tạo slide cho học sinh cấp 3"),
-    files: List[UploadFile] = File(None, description="Tài liệu tham khảo (PDF, DOCX)")
+    files: List[UploadFile] = File(None, description="Tài liệu tham khảo (PDF, DOCX, TXT)")
 ):
     """
     API tạo slide cho học sinh cấp 3 - Ưu tiên file upload, bắt buộc RAG
@@ -22,7 +31,7 @@ async def create_slides(
     try:
         logger.info(f"Creating slides for topic: {topic}")
         
-        # Extract content from uploaded files (simplified)
+        # Extract content from uploaded files with proper loaders
         uploaded_content = ""
         if files and len(files) > 0:
             valid_files = [f for f in files if f is not None and f.filename]
@@ -31,23 +40,53 @@ async def create_slides(
                 try:
                     logger.info(f"Processing file: {file.filename}")
                     
-                    # Read file content
-                    content = await file.read()
+                    # Create temporary file
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(file.filename)[1]) as temp_file:
+                        content = await file.read()
+                        temp_file.write(content)
+                        temp_file_path = temp_file.name
                     
-                    # Simple text extraction
-                    if file.filename.endswith('.txt'):
-                        file_text = content.decode('utf-8')
-                    elif file.filename.endswith(('.pdf', '.docx')):
-                        # For now, treat as text (in production, use proper loaders)
-                        file_text = f"Nội dung từ {file.filename} (cần xử lý file)"
-                    else:
-                        file_text = f"File: {file.filename}"
-                    
-                    uploaded_content += f"\n=== {file.filename} ===\n{file_text}\n"
+                    try:
+                        # Use proper document loaders based on file type
+                        if file.filename.lower().endswith('.pdf'):
+                            loader = PyMuPDFLoader(temp_file_path)
+                            documents = loader.load()
+                            file_text = "\n".join([doc.page_content for doc in documents])
+                            
+                        elif file.filename.lower().endswith(('.docx', '.doc')):
+                            loader = Docx2txtLoader(temp_file_path)
+                            documents = loader.load()
+                            file_text = "\n".join([doc.page_content for doc in documents])
+                            
+                        elif file.filename.lower().endswith('.txt'):
+                            loader = TextLoader(temp_file_path, encoding='utf-8')
+                            documents = loader.load()
+                            file_text = "\n".join([doc.page_content for doc in documents])
+                            
+                        else:
+                            # Fallback for other file types
+                            file_text = f"Không hỗ trợ định dạng file: {file.filename}"
+                        
+                        # Add to uploaded content with clear marking
+                        uploaded_content += f"\n=== THÔNG TIN TỪ FILE: {file.filename} ===\n"
+                        uploaded_content += f"[BẮT BUỘC SỬ DỤNG - ƯU TIÊN TUYỆT ĐỐI]\n"
+                        uploaded_content += f"{file_text}\n"
+                        uploaded_content += f"=== KẾT THÚC FILE: {file.filename} ===\n\n"
+                        
+                        logger.info(f"Successfully extracted {len(file_text)} characters from {file.filename}")
+                        
+                    finally:
+                        # Clean up temporary file
+                        os.unlink(temp_file_path)
                     
                 except Exception as e:
                     logger.error(f"Error processing {file.filename}: {e}")
                     uploaded_content += f"\nLỗi xử lý {file.filename}: {str(e)}\n"
+        
+        # Log the extracted content for debugging
+        if uploaded_content.strip():
+            logger.info(f"Total uploaded content length: {len(uploaded_content)} characters")
+            logger.info(f"First 200 chars of uploaded content: {uploaded_content[:200]}...")
         
         # Call the simplified slide creator
         result = await run_slide_creator(
