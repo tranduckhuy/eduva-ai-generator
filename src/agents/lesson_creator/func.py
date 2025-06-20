@@ -15,42 +15,92 @@ class State(TypedDict):
     messages: Annotated[Sequence[AnyMessage], add_messages]
     selected_documents: Optional[List[Document]]
     slide_data: Optional[dict]
+    uploaded_files_content: Optional[str]  # New field for uploaded files
+    rag_sources: Optional[List[dict]]  # New field for RAG source tracking
 
 
 def execute_tool(state: State):
     """Execute RAG tool to retrieve relevant documents"""
-    tool_calls = state["messages"][-1].tool_calls
+    messages = state.get("messages", [])
+    if not messages:
+        logger.error("No messages in state")
+        return {
+            "selected_documents": [],
+            "rag_sources": [],
+            "messages": [],
+        }
+    
+    last_message = messages[-1]
+    tool_calls = getattr(last_message, 'tool_calls', None)
+    
+    if not tool_calls:
+        logger.warning("No tool calls found in last message")
+        return {
+            "selected_documents": [],
+            "rag_sources": [],
+            "messages": [],
+        }
+    
     tool_messages = []
     selected_documents = []
+    rag_sources = []
     
     logger.info(f"execute_tool called with {len(tool_calls)} tool calls")
     
     for tool_call in tool_calls:
-        tool_name = tool_call["name"]
-        tool_args = tool_call["args"]
-        tool_id = tool_call["id"]
-        
-        logger.info(f"Executing tool: {tool_name} with args: {tool_args}")
+        try:
+            tool_name = tool_call.get("name", "")
+            tool_args = tool_call.get("args", {})
+            tool_id = tool_call.get("id", "")
+            
+            logger.info(f"Executing tool: {tool_name} with args: {tool_args}")
 
-        if tool_name == "retrieve_document":
-            query = tool_args.get("query", "")
-            logger.info(f"RAG Query: {query}")
-            
-            result = retrieve_document.invoke(query)
-            context_str = result.get("context_str", "")
-            selected_documents = result.get("selected_documents", [])
-            
-            logger.info(f"Retrieved {len(selected_documents)} documents")
-            
-            tool_messages.append(
-                ToolMessage(
-                    tool_call_id=tool_id,
-                    content=context_str,
+            if tool_name == "retrieve_document":
+                query = tool_args.get("query", "")
+                logger.info(f"RAG Query: {query}")
+                
+                result = retrieve_document.invoke(query)
+                context_str = result.get("context_str", "")
+                doc_list = result.get("selected_documents", [])
+                
+                # Safely handle document list
+                if doc_list:
+                    selected_documents.extend(doc_list)
+                    
+                    # Create RAG sources for response tracking
+                    for i, doc in enumerate(doc_list):
+                        try:
+                            if hasattr(doc, 'metadata') and hasattr(doc, 'page_content'):
+                                rag_sources.append({
+                                    "source_id": f"rag_{i+1}",
+                                    "source_type": "vector_store",
+                                    "title": doc.metadata.get("title", f"Tài liệu {i+1}") if doc.metadata else f"Tài liệu {i+1}",
+                                    "content_preview": (doc.page_content[:200] + "...") if len(doc.page_content) > 200 else doc.page_content,
+                                    "metadata": doc.metadata if doc.metadata else {}
+                                })
+                        except Exception as e:
+                            logger.error(f"Error processing document {i}: {e}")
+                
+                logger.info(f"Retrieved {len(selected_documents)} documents")
+                
+                # Add priority instruction for uploaded files vs RAG
+                uploaded_files_note = ""
+                if state.get("uploaded_files_content"):
+                    uploaded_files_note = "\n\nQUAN TRỌNG: Người dùng đã upload file tài liệu. Ưu tiên sử dụng nội dung từ file upload hơn là tài liệu từ vector store."
+                
+                tool_messages.append(
+                    ToolMessage(
+                        tool_call_id=tool_id,
+                        content=context_str + uploaded_files_note,
+                    )
                 )
-            )
+        except Exception as e:
+            logger.error(f"Error executing tool call: {e}")
+            # Continue with other tool calls even if one fails
 
     return {
         "selected_documents": selected_documents,
+        "rag_sources": rag_sources,
         "messages": tool_messages,
     }
 

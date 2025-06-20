@@ -13,7 +13,8 @@ def retrieve_document(query: str):
         search_kwargs={"k": 5, "score_threshold": 0.25},
     )
     documents = retriever.invoke(query)
-    selected_documents = [doc.__dict__ for doc in documents]
+    # Keep original Document objects instead of converting to dict
+    selected_documents = documents  # Changed this line
     selected_ids = [doc.metadata.get("id", f"doc_{i}") for i, doc in enumerate(documents)]
     context_str = convert_list_context_source_to_str(documents)
 
