@@ -10,13 +10,6 @@ from typing import TypeVar
 
 State = TypeVar("State", bound=Dict[str, Any])
 
-
-def fake_token_counter(messages: Union[list[BaseMessage], BaseMessage]) -> int:
-    if isinstance(messages, list):
-        return sum(len(message.content.split()) for message in messages)
-    return len(messages.content.split())
-
-
 def convert_list_context_source_to_str(contexts: list[Document]):
     formatted_str = ""
     for i, context in enumerate(contexts):

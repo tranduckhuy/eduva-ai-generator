@@ -1,16 +1,25 @@
-from fastapi import APIRouter, status, UploadFile, File
-from fastapi.responses import JSONResponse
-from src.utils.logger import logger
+# src/api/routers/file_processing_router.py
 
-from langchain_docling import DoclingLoader
-from langchain_text_splitters import RecursiveCharacterTextSplitter
+from fastapi import APIRouter, status, UploadFile, File, Form
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel, Field
+from typing import Optional, List
+from src.utils.logger import logger, get_date_time
+from src.config.vector_store import vector_store
+
 import os
 import tempfile
 import shutil
-import fitz
+import fitz  # PyMuPDF
 from docx import Document as DocxDoc
-from src.config.vector_store import vector_store
-from pydantic import BaseModel, Field
+
+# LangChain tools
+from langchain_community.document_loaders import (
+    PyMuPDFLoader,
+    Docx2txtLoader,
+    UnstructuredFileLoader,
+)
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 router = APIRouter(prefix="/file", tags=["File Processing"])
 
@@ -22,32 +31,37 @@ class FileIngressResponse(BaseModel):
     message: str = Field(
         "File processed and indexed successfully", title="Status message"
     )
+    metadata: Optional[dict] = Field(None, title="Document metadata")
 
 
 @router.post("/analyze")
-async def analyze_file(
-    file: UploadFile = File(...),
-):
+async def analyze_file(file: UploadFile = File(...)):
     try:
         temp_dir = tempfile.mkdtemp()
         temp_file_path = os.path.join(temp_dir, file.filename)
+
         with open(temp_file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
+
         file_extension = os.path.splitext(file.filename)[1].lower()
         file_type = file_extension.replace(".", "").upper()
+
         word_count = 0
         image_count = 0
+
         if file_extension == ".pdf":
             doc = fitz.open(temp_file_path)
-            for page in doc:
-                text = page.get_text("text")
-                word_count += len(text.split())
-                image_count += len(page.get_images(full=True))
+            try:
+                for page in doc:
+                    text = page.get_text("text")
+                    word_count += len(text.split())
+                    image_count += len(page.get_images(full=True))
+            finally:
+                doc.close()  # Ensure the PDF is properly closed
         elif file_extension == ".docx":
             doc = DocxDoc(temp_file_path)
             for para in doc.paragraphs:
                 word_count += len(para.text.split())
-            image_count = 0
             for rel in doc.part._rels.values():
                 if "image" in rel.target_ref:
                     image_count += 1
@@ -81,6 +95,8 @@ async def analyze_file(
 @router.post("/ingress", response_model=FileIngressResponse)
 async def ingress_file(
     file: UploadFile = File(...),
+    subject: Optional[str] = Form(None, description="Môn học (Toán, Vật lý, Hóa học, ...)"),
+    grade: Optional[str] = Form(None, description="Lớp (10, 11, 12)")
 ):
     try:
         logger.info(f"Processing and indexing file: {file.filename}")
@@ -91,13 +107,44 @@ async def ingress_file(
         with open(temp_file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
 
-        loader = DoclingLoader(file_path=temp_file_path, export_type="markdown")
+        # Use appropriate loader
+        file_extension = os.path.splitext(file.filename)[1].lower()
+        if file_extension == ".pdf":
+            loader = PyMuPDFLoader(temp_file_path)
+        elif file_extension == ".docx":
+            loader = Docx2txtLoader(temp_file_path)
+        else:
+            loader = UnstructuredFileLoader(temp_file_path)
+
         docs = loader.load()
+
+        # Tạo metadata đơn giản chỉ với subject và grade
+        document_metadata = {
+            "filename": file.filename,
+            "file_type": file_extension,
+            "subject": subject,
+            "grade": grade,
+            "source": "file_upload",
+            "created_at": str(get_date_time())
+        }
+
+        # Thêm metadata vào từng document chunk
+        for doc in docs:
+            if not hasattr(doc, 'metadata'):
+                doc.metadata = {}
+            doc.metadata.update(document_metadata)
 
         splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
         chunks = splitter.split_documents(docs)
 
-        vector_store.add_documents(chunks)
+        # Đảm bảo metadata được kế thừa trong chunks
+        for chunk in chunks:
+            if not hasattr(chunk, 'metadata'):
+                chunk.metadata = {}
+            chunk.metadata.update(document_metadata)
+
+        # Add to vector store (async)
+        await vector_store.add_documents(chunks)
 
         shutil.rmtree(temp_dir)
         chunks_count = len(chunks)
@@ -107,6 +154,7 @@ async def ingress_file(
             chunks_count=chunks_count,
             success=True,
             message=f"File processed and indexed successfully. Created {chunks_count} chunks.",
+            metadata=document_metadata
         )
 
     except Exception as e:
@@ -118,5 +166,6 @@ async def ingress_file(
                 "chunks_count": 0,
                 "success": False,
                 "message": f"Error processing file: {str(e)}",
+                "metadata": None
             },
         )
