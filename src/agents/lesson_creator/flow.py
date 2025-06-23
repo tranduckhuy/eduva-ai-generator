@@ -4,18 +4,25 @@ from .func import create_slide_data
 from .prompt import create_messages_for_llm
 
 
-async def run_slide_creator(topic: str, uploaded_files_content: str = None, model_name: str = "gemini-2.0-flash"):
+async def run_slide_creator(topic: str, subject: str = None, grade: str = None, uploaded_files_content: str = None, model_name: str = "gemini-2.0-flash"):
     """Simplified slide creator with essential features only"""
     try:
-        logger.info(f"Creating slides for topic: {topic}")
-        
-        # Step 1: Retrieve documents from vector store
-        rag_result = retrieve_document.invoke(topic)
+        logger.info(f"Creating slides for topic: {topic}, subject: {subject}, grade: {grade}")
+          # Step 1: Retrieve documents from vector store với metadata filter
+        rag_result = retrieve_document.invoke({
+            "query": topic,
+            "subject": subject,
+            "grade": grade
+        })
         rag_context = rag_result.get("context_str", "")
         selected_documents = rag_result.get("selected_documents", [])
         
         logger.info(f"Retrieved {len(selected_documents)} documents from vector store")
-        
+        # Log short summary of text content in selected documents
+        if selected_documents:
+            logger.info(f"Selected documents content: {', '.join([doc.page_content[:100] for doc in selected_documents])}")
+            
+
         # Step 2: Build prompt messages
         prompt_messages = create_messages_for_llm(
             topic=topic,
@@ -39,6 +46,10 @@ async def run_slide_creator(topic: str, uploaded_files_content: str = None, mode
             lesson_info["primary_source"] = "file_upload" if uploaded_files_content else "vector_store"
             lesson_info["rag_documents_count"] = len(selected_documents)
             lesson_info["target_level"] = "Cấp 3 (lớp 10-12)"
+            if subject:
+                lesson_info["subject"] = subject
+            if grade:
+                lesson_info["grade"] = grade
         
         logger.info(f"Successfully created slides")
         

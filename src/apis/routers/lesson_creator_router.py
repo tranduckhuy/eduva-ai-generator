@@ -5,6 +5,7 @@ import tempfile
 import os
 from src.agents.lesson_creator.flow import run_slide_creator
 from src.utils.logger import logger
+from src.config.enums import SubjectEnum, GradeEnum
 
 # Simplified document loaders
 from langchain_community.document_loaders import PyMuPDFLoader, Docx2txtLoader, TextLoader
@@ -14,11 +15,13 @@ router = APIRouter(prefix="/ai", tags=["AI"])
 @router.post("/slide-creator")
 async def create_slides(
     topic: str = Form(..., description="Chủ đề cần tạo slide"),
+    subject: Optional[SubjectEnum] = Form(None, description="Môn học"),
+    grade: Optional[GradeEnum] = Form(None, description="Lớp (10, 11, 12)"),
     files: List[UploadFile] = File(None, description="Tài liệu tham khảo")
 ):
     """API tạo slide cho học sinh cấp 3"""
     try:
-        logger.info(f"Creating slides for: {topic}")
+        logger.info(f"Creating slides for: {topic}, subject: {subject}, grade: {grade}")
         
         # Extract content from uploaded files
         uploaded_content = ""
@@ -52,10 +55,11 @@ async def create_slides(
                     
                 except Exception as e:
                     logger.error(f"Error processing {file.filename}: {e}")
-        
-        # Create slides
+          # Create slides với metadata filter
         result = await run_slide_creator(
             topic=topic,
+            subject=subject.value if subject else None,
+            grade=grade.value if grade else None,
             uploaded_files_content=uploaded_content if uploaded_content.strip() else None
         )
         

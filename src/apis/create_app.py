@@ -13,7 +13,7 @@ api_router.include_router(vector_store_router)
 
 def create_app():
     app = FastAPI(
-        docs_url="/docs",
+        docs_url="/swagger",
         title="AI Service",
     )
 
