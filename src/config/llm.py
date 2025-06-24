@@ -4,13 +4,13 @@ from langchain_google_genai.embeddings import GoogleGenerativeAIEmbeddings
 from src.utils.logger import logger
 
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
-DEFAULT_MODEL = os.getenv("DEFAULT_MODEL", "gemini-2.0-flash")
+DEFAULT_MODEL = os.getenv("DEFAULT_MODEL", "gemini-2.5-flash-lite-preview-06-17")
 TEMPERATURE = float(os.getenv("TEMPERATURE", "1.0"))
 
 # Default model instances
 llm_2_0 = ChatGoogleGenerativeAI(model=DEFAULT_MODEL, temperature=1)
 llm_2_5_flash_preview = ChatGoogleGenerativeAI(
-    model="gemini-2.5-flash-preview-05-20", temperature=1
+    model="gemini-2.5-flash-lite-preview-06-17", temperature=1
 )
 
 # Default embeddings model
@@ -31,6 +31,9 @@ def get_llm(model_name: str, api_key: str = None) -> ChatGoogleGenerativeAI:
     Raises:
         ValueError: If model name is not supported
     """
+    # log model name
+    logger.info(f"Getting LLM for model: {model_name}")
+
     if api_key:
         logger.warning("Using custom API key")
         return ChatGoogleGenerativeAI(
@@ -39,7 +42,7 @@ def get_llm(model_name: str, api_key: str = None) -> ChatGoogleGenerativeAI:
 
     if model_name == DEFAULT_MODEL:
         return llm_2_0
-    elif model_name == "gemini-2.5-flash-preview-05-20":
+    elif model_name == "gemini-2.5-flash-lite-preview-06-17":
         return llm_2_5_flash_preview
 
     raise ValueError(f"Unknown model: {model_name}")

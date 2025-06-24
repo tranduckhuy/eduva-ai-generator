@@ -1,19 +1,29 @@
+import asyncio
+import functools
 from src.utils.logger import logger
 from .tools import retrieve_document
 from .func import create_slide_data
 from .prompt import create_messages_for_llm
 
 
-async def run_slide_creator(topic: str, subject: str = None, grade: str = None, uploaded_files_content: str = None, model_name: str = "gemini-2.0-flash"):
+async def run_slide_creator(topic: str, subject: str = None, grade: str = None, uploaded_files_content: str = None, model_name: str = "gemini-2.5-flash-lite-preview-06-17"):
     """Simplified slide creator with essential features only"""
     try:
         logger.info(f"Creating slides for topic: {topic}, subject: {subject}, grade: {grade}")
           # Step 1: Retrieve documents from vector store với metadata filter
-        rag_result = retrieve_document.invoke({
-            "query": topic,
-            "subject": subject,
-            "grade": grade
-        })
+        # Run the synchronous retrieve_document.invoke in a thread pool to avoid blocking
+        loop = asyncio.get_running_loop()
+        rag_result = await loop.run_in_executor(
+            None, 
+            functools.partial(
+                retrieve_document.invoke,
+                {
+                    "query": topic,
+                    "subject": subject,
+                    "grade": grade
+                }
+            )
+        )
         rag_context = rag_result.get("context_str", "")
         selected_documents = rag_result.get("selected_documents", [])
         
