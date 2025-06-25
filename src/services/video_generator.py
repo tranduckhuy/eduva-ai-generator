@@ -3,16 +3,19 @@ import os
 import gc
 import time
 import platform
-import requests
 from typing import List, Dict, Any
 from concurrent.futures import ThreadPoolExecutor
 from google.cloud import texttospeech
 from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips, VideoFileClip, AudioClip
-from PIL import Image, ImageDraw, ImageFont
 import tempfile
 import logging
 from contextlib import contextmanager
 import shutil
+
+# Import our new helper modules
+from .image_generator import ImageGenerator
+from .content_formatter import ContentFormatter
+from .slide_processor import SlideProcessor
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +49,10 @@ class VideoGenerator:
         # Platform-specific settings
         self.is_windows = platform.system() == "Windows"
         self.cleanup_delay = 0.5 if self.is_windows else 0.1  # Longer delay on Windows
+        
+        # Initialize helper classes
+        self.slide_processor = SlideProcessor(self.unsplash_access_key)
+        self.content_formatter = ContentFormatter()
 
     @contextmanager
     def _safe_moviepy_context(self):
@@ -89,16 +96,28 @@ class VideoGenerator:
             slides = lesson_data.get('slides', [])
             if not slides:
                 raise ValueError("No slides found in lesson data")
+              # Validate and normalize output path
+            output_path = os.path.abspath(output_path)
+            os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
             # Create temporary directory for intermediate files
             with tempfile.TemporaryDirectory() as temp_dir:
                 logger.info(f"Processing {len(slides)} slides...")
+                logger.info(f"Using temporary directory: {temp_dir}")
+                logger.info(f"Output path: {output_path}")
                 
                 # Process all slides concurrently
                 slide_video_paths = await self._process_slides_concurrent(slides, temp_dir)
                 
+                # Filter out None values (failed slides)
+                valid_paths = [path for path in slide_video_paths if path and os.path.exists(path)]
+                if not valid_paths:
+                    raise ValueError("No slide videos were successfully created")
+                
+                logger.info(f"Successfully created {len(valid_paths)} out of {len(slides)} slide videos")
+                
                 # Combine all slide videos
-                final_video_path = await self._combine_videos(slide_video_paths, output_path)
+                final_video_path = await self._combine_videos(valid_paths, output_path)
                 
                 logger.info(f"Video generation completed: {final_video_path}")
                 return final_video_path
@@ -125,33 +144,43 @@ class VideoGenerator:
                 tasks.append(task)
             
             # Wait for all tasks to complete
-            slide_video_paths = await asyncio.gather(*tasks)
-            
-            # Sort by slide order
+            slide_video_paths = await asyncio.gather(*tasks)            # Sort by slide order
             return [path for path in slide_video_paths if path]
 
     def _process_single_slide(self, slide: Dict, slide_index: int, temp_dir: str) -> str:
-        """Process a single slide: get image, generate TTS, create video"""
+        """Process a single slide: get images, generate TTS, create video"""
         try:
             slide_id = slide.get('slide_id', slide_index + 1)
             logger.info(f"Processing slide {slide_id}...")
             
-            # Generate audio from TTS
+            # Ensure temp_dir exists and is accessible
+            os.makedirs(temp_dir, exist_ok=True)
+              # Generate audio from TTS with proper path handling
+            audio_filename = f"audio_{slide_id}.mp3"
+            audio_path = os.path.join(temp_dir, audio_filename)
+            
             audio_path = self._generate_tts_audio(
                 slide.get('tts_script', ''), 
-                os.path.join(temp_dir, f"audio_{slide_id}.mp3")
+                audio_path
             )
             
-            # Get or create image
-            image_path = self._get_slide_image(
-                slide.get('image_keywords', []),
-                slide.get('title', ''),
-                os.path.join(temp_dir, f"image_{slide_id}.jpg")
-            )
+            # Get audio duration with proper cleanup
+            with self._safe_moviepy_context() as clips:
+                audio_clip = AudioFileClip(audio_path)
+                clips.append(audio_clip)
+                audio_duration = audio_clip.duration
             
-            # Create video for this slide
-            video_path = os.path.join(temp_dir, f"slide_{slide_id}.mp4")
-            self._create_slide_video(image_path, audio_path, video_path)
+            # Process slide images using the new optimized approach
+            slide_result = self.slide_processor.process_slide_images(slide, temp_dir, slide_id)
+            
+            # Calculate optimal timing for images based on audio duration
+            slide_result = self.slide_processor.calculate_slide_timing(slide_result, audio_duration)
+            
+            # Create video for this slide with proper path handling
+            video_filename = f"slide_{slide_id}.mp4"
+            video_path = os.path.join(temp_dir, video_filename)
+            
+            self._create_slide_video_with_timing(slide_result, audio_path, video_path)
             
             logger.info(f"Slide {slide_id} processed successfully")
             return video_path
@@ -167,6 +196,10 @@ class VideoGenerator:
             return self._create_silent_audio(output_path, duration=2.0)
         
         try:
+            # Validate and normalize the output path
+            output_path = os.path.abspath(output_path)
+            os.makedirs(os.path.dirname(output_path), exist_ok=True)
+            
             synthesis_input = texttospeech.SynthesisInput(text=text)
             response = self.tts_client.synthesize_speech(
                 input=synthesis_input,
@@ -175,8 +208,7 @@ class VideoGenerator:
             )
             
             with open(output_path, "wb") as out:
-                out.write(response.audio_content)
-            
+                out.write(response.audio_content)            
             logger.debug(f"TTS audio generated: {output_path}")
             return output_path
             
@@ -185,122 +217,62 @@ class VideoGenerator:
             # Fallback to silent audio
             return self._create_silent_audio(output_path, duration=3.0)
 
-    def _get_slide_image(self, keywords: List[str], title: str, output_path: str) -> str:
-        """Get image from Unsplash or create placeholder"""
-        # Try to get image from Unsplash if access key is available
-        if self.unsplash_access_key and keywords:
-            image_url = self._search_unsplash_image(keywords[0])
-            if image_url:
-                if self._download_image(image_url, output_path):
-                    return output_path
+    def _create_slide_video_with_timing(self, slide_result: Dict[str, Any], audio_path: str, output_path: str):
+        """Create video from slide result with proper timing"""        # Validate and normalize paths
+        output_path = os.path.abspath(output_path)
+        audio_path = os.path.abspath(audio_path)
         
-        # Fallback: create placeholder image
-        return self._create_placeholder_image(title, keywords, output_path)
-
-    def _search_unsplash_image(self, keyword: str) -> str:
-        """Search for image on Unsplash"""
-        try:
-            url = f"https://api.unsplash.com/search/photos"
-            params = {
-                'query': keyword,
-                'client_id': self.unsplash_access_key,
-                'orientation': 'landscape',
-                'per_page': 1,
-            }
-            
-            response = requests.get(url, params=params, timeout=10)
-            if response.status_code == 200:
-                data = response.json()
-                if data['results']:
-                    return data['results'][0]['urls']['regular']
-                else:
-                    logger.warning("No results found on Unsplash")
-                
-        except Exception as e:
-            logger.warning(f"Error searching Unsplash: {e}")
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
         
-        return None
-
-    def _download_image(self, url: str, output_path: str) -> bool:
-        """Download image from URL"""
-        try:
-            response = requests.get(url, timeout=15)
-            if response.status_code == 200:
-                with open(output_path, 'wb') as f:
-                    f.write(response.content)
-                return True
-        except Exception as e:
-            logger.warning(f"Error downloading image: {e}")
-        
-        return False
-
-    def _create_placeholder_image(self, title: str, keywords: List[str], output_path: str) -> str:
-        """Create a placeholder image with title and keywords"""
-        # Create a 1920x1080 image
-        img = Image.new('RGB', (1920, 1080), color='#f0f4f8')
-        draw = ImageDraw.Draw(img)
-        
-        try:
-            # Try to use a system font based on platform
-            if self.is_windows:
-                title_font = ImageFont.truetype("arial.ttf", 72)
-                keyword_font = ImageFont.truetype("arial.ttf", 36)
-            else:
-                # Linux/Mac font paths
-                for font_path in ["/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 
-                                "/System/Library/Fonts/Arial.ttf",
-                                "/usr/share/fonts/TTF/arial.ttf"]:
-                    try:
-                        title_font = ImageFont.truetype(font_path, 72)
-                        keyword_font = ImageFont.truetype(font_path, 36)
-                        break
-                    except:
-                        continue
-                else:
-                    raise OSError("No suitable font found")
-        except:
-            # Fallback to default font
-            title_font = ImageFont.load_default()
-            keyword_font = ImageFont.load_default()
-        
-        # Draw title
-        title_text = title[:50] + "..." if len(title) > 50 else title
-        title_bbox = draw.textbbox((0, 0), title_text, font=title_font)
-        title_width = title_bbox[2] - title_bbox[0]
-        title_x = (1920 - title_width) // 2
-        draw.text((title_x, 400), title_text, fill='#2d3748', font=title_font)
-        
-        # Draw keywords
-        if keywords:
-            keywords_text = " • ".join(keywords[:5])
-            keywords_bbox = draw.textbbox((0, 0), keywords_text, font=keyword_font)
-            keywords_width = keywords_bbox[2] - keywords_bbox[0]
-            keywords_x = (1920 - keywords_width) // 2
-            draw.text((keywords_x, 600), keywords_text, fill='#4a5568', font=keyword_font)
-        
-        img.save(output_path, 'JPEG', quality=85)
-        logger.debug(f"Placeholder image created: {output_path}")
-        return output_path
-
-    def _create_slide_video(self, image_path: str, audio_path: str, output_path: str):
-        """Create video from image and audio with proper cleanup"""
         with self._safe_moviepy_context() as clips:
             try:
-                # Load audio to get duration
+                # Load audio
                 audio_clip = AudioFileClip(audio_path)
                 clips.append(audio_clip)
-                duration = audio_clip.duration
-                  # Create image clip with audio duration
-                image_clip = ImageClip(image_path).set_duration(duration)
-                clips.append(image_clip)
+                total_duration = audio_clip.duration
                 
-                # Combine image and audio
-                final_clip = image_clip.set_audio(audio_clip)
+                images = slide_result['images']
+                if not images:
+                    raise ValueError("No images provided for video creation")                # Create image clips with calculated durations
+                image_clips = []
+                current_time = 0
+                
+                for img_info in images:
+                    image_path = os.path.abspath(img_info['path'])
+                    duration = img_info['duration']
+                    
+                    # Verify image file exists
+                    if not os.path.exists(image_path):
+                        logger.warning(f"Image file not found: {image_path}")
+                        continue
+                    
+                    # Create image clip
+                    image_clip = ImageClip(image_path).set_duration(duration).set_start(current_time)
+                    image_clips.append(image_clip)
+                    clips.append(image_clip)
+                    
+                    current_time += duration
+                
+                # Create composite video
+                if len(image_clips) == 1:
+                    video_clip = image_clips[0]
+                else:
+                    # Use CompositeVideoClip to layer images over time
+                    from moviepy.editor import CompositeVideoClip
+                    video_clip = CompositeVideoClip(image_clips, size=(1920, 1080))
+                
+                clips.append(video_clip)
+                
+                # Ensure video duration matches audio duration
+                video_clip = video_clip.set_duration(total_duration)
+                
+                # Combine with audio
+                final_clip = video_clip.set_audio(audio_clip)
                 clips.append(final_clip)
 
-                logger.info(f"Creating video for slide: {image_path} with audio: {audio_path}")
+                logger.info(f"Creating video with {len(images)} images, total duration: {total_duration:.2f}s")
                 
-                # Write video file with safe operation
+                # Write video file
                 self._safe_file_operation(
                     final_clip.write_videofile,
                     output_path,
@@ -320,11 +292,20 @@ class VideoGenerator:
         try:
             if not video_paths:
                 raise ValueError("No video files to combine")
+              # Validate video files exist and normalize paths
+            valid_paths = []
+            for path in video_paths:
+                if path and os.path.exists(path):
+                    valid_paths.append(os.path.abspath(path))
+                else:
+                    logger.warning(f"Video file not found: {path}")
             
-            # Validate video files exist
-            valid_paths = [path for path in video_paths if os.path.exists(path)]
             if not valid_paths:
                 raise ValueError("No valid video clips found")
+            
+            # Validate and normalize output path
+            output_path = os.path.abspath(output_path)
+            os.makedirs(os.path.dirname(output_path), exist_ok=True)
             
             with self._safe_moviepy_context() as clips:
                 # Load all video clips
@@ -334,12 +315,14 @@ class VideoGenerator:
                 
                 if not clips:
                     raise ValueError("No clips loaded successfully")
-                  # Concatenate all clips
+                
+                # Concatenate all clips
                 final_video = concatenate_videoclips(clips, method="compose")
                 clips.append(final_video)
                 
-                # Create temporary output path to avoid conflicts
-                temp_output = output_path.replace('.mp4', '_temp.mp4')
+                # Create temporary output path to avoid conflicts with proper path handling
+                temp_filename = f"{os.path.splitext(os.path.basename(output_path))[0]}_temp.mp4"
+                temp_output = os.path.join(os.path.dirname(output_path), temp_filename)
                 
                 # Write final video with safe operation  
                 self._safe_file_operation(
@@ -362,19 +345,23 @@ class VideoGenerator:
                 
                 logger.info(f"Final video saved: {output_path}")
                 return output_path
+                
         except Exception as e:
-            logger.error(f"Error combining videos: {e}")
-            # Clean up temp file if it exists
-            temp_output = output_path.replace('.mp4', '_temp.mp4')
-            if os.path.exists(temp_output):
-                try:
+            logger.error(f"Error combining videos: {e}")            # Clean up temp file if it exists
+            try:
+                temp_filename = f"{os.path.splitext(os.path.basename(output_path))[0]}_temp.mp4"
+                temp_output = os.path.join(os.path.dirname(output_path), temp_filename)
+                if os.path.exists(temp_output):
                     os.remove(temp_output)
-                except:
-                    pass
+            except Exception as cleanup_error:
+                logger.warning(f"Could not clean up temp file: {cleanup_error}")
             raise
 
     def _create_silent_audio(self, output_path: str, duration: float) -> str:
-        """Create silent audio file with proper cleanup"""
+        """Create silent audio file with proper cleanup"""        # Validate and normalize the output path
+        output_path = os.path.abspath(output_path)
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        
         with self._safe_moviepy_context() as clips:
             try:
                 def make_frame(t):
@@ -420,3 +407,5 @@ class VideoGenerator:
         except Exception as e:
             logger.error(f"Error getting available voices: {e}")
             return []
+  
+    
