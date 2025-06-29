@@ -244,3 +244,67 @@ async def generate_video_from_slides(request: VideoFromSlideDataRequest):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             content={"success": False, "error": str(e)}
         )
+
+@router.get("/templates")
+async def get_available_templates():
+    """Get available slide templates"""
+    try:
+        video_generator = VideoGenerator()
+        templates = video_generator.slide_processor.image_generator.get_available_templates()
+        
+        return JSONResponse(content={
+            "success": True,
+            "templates": templates,
+            "current_template": video_generator.slide_processor.image_generator.template_manager.current_template
+        })
+    except Exception as e:
+        logger.error(f"Error getting templates: {e}")
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={"success": False, "error": str(e)}
+        )
+
+class VideoWithTemplateRequest(BaseModel):
+    lesson_data: Dict[str, Any]
+    template_name: Optional[str] = "modern_blue"
+    voice_config: Optional[Dict[str, Any]] = None
+
+@router.post("/generate-with-template")
+async def generate_video_with_template(request: VideoWithTemplateRequest):
+    """Generate video with specific template"""
+    try:
+        # Initialize video generator with template
+        voice_config = request.voice_config or {}
+        video_generator = VideoGenerator(voice_config=voice_config)
+        
+        # Set template
+        if request.template_name:
+            video_generator.slide_processor.image_generator.set_template(request.template_name)
+            logger.info(f"Using template: {request.template_name}")
+        
+        # Generate timestamp for unique filename
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        output_filename = f"lesson_{timestamp}.mp4"
+        output_path = os.path.join("src", "apis", "routers", "temp_videos", output_filename)
+        
+        # Ensure temp directory exists
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        
+        # Generate video
+        video_path = await video_generator.generate_lesson_video(request.lesson_data, output_path)
+        
+        return JSONResponse(content={
+            "success": True,
+            "video_path": video_path,
+            "filename": output_filename,
+            "template_used": request.template_name,
+            "slides_count": len(request.lesson_data.get('slides', [])),
+            "message": f"Video generated successfully with {request.template_name} template"
+        })
+        
+    except Exception as e:
+        logger.error(f"Error generating video with template: {e}")
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={"success": False, "error": str(e)}
+        )

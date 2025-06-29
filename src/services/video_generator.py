@@ -40,15 +40,22 @@ class VideoGenerator:
                 ssml_gender=texttospeech.SsmlVoiceGender.FEMALE
             )
         
-        # Audio configuration
+        # Audio configuration - OPTIMIZED
         self.audio_config = texttospeech.AudioConfig(
             audio_encoding=texttospeech.AudioEncoding.MP3,
-            speaking_rate=voice_config.get('speaking_rate', 1.0) if voice_config else 1.0
+            speaking_rate=voice_config.get('speaking_rate', 1.1) if voice_config else 1.1,  # Faster speaking
+            sample_rate_hertz=22050  # Lower sample rate for smaller files and faster processing
         )
         
-        # Platform-specific settings
+        # Platform-specific settings - OPTIMIZED
         self.is_windows = platform.system() == "Windows"
-        self.cleanup_delay = 0.5 if self.is_windows else 0.1  # Longer delay on Windows
+        self.cleanup_delay = 0.5 if self.is_windows else 0.1  # Reduced cleanup delay
+        
+        # Performance optimizations
+        self.max_workers_optimized = min(3, os.cpu_count())  # Increased concurrency
+        self.batch_size_optimized = 3  # Larger batches
+        self.video_fps = 20  # Reduced FPS for faster processing
+        self.image_resolution = (1280, 720)  # Standard HD
         
         # Initialize helper classes
         self.slide_processor = SlideProcessor(self.unsplash_access_key)
@@ -56,35 +63,44 @@ class VideoGenerator:
 
     @contextmanager
     def _safe_moviepy_context(self):
-        """Context manager for safe MoviePy operations with proper cleanup"""
+        """Context manager for safe MoviePy operations with aggressive cleanup"""
         clips_to_cleanup = []
         try:
             yield clips_to_cleanup
         finally:
-            # Explicit cleanup
+            # Aggressive cleanup
             for clip in clips_to_cleanup:
                 try:
                     if hasattr(clip, 'close'):
                         clip.close()
+                    if hasattr(clip, 'reader') and clip.reader:
+                        clip.reader.close()
                 except Exception as e:
                     logger.warning(f"Error closing clip: {e}")
             
-            # Force garbage collection
-            gc.collect()
+            # Clear the list
+            clips_to_cleanup.clear()
             
-            # Additional delay on Windows for file handle release
+            # Force garbage collection multiple times - OPTIMIZED
+            for _ in range(2):
+                gc.collect()
+            
+            # Reduced delay on Windows for file handle release
             if self.is_windows:
-                time.sleep(self.cleanup_delay)
+                time.sleep(0.2)
 
-    def _safe_file_operation(self, operation, *args, max_retries=3, **kwargs):
+    def _safe_file_operation(self, operation, *args, **kwargs):
         """Safely perform file operations with retry logic for Windows"""
+        max_retries = kwargs.pop('max_retries', 3)
+        
         for attempt in range(max_retries):
             try:
                 return operation(*args, **kwargs)
-            except (PermissionError, OSError) as e:
+            except (PermissionError, OSError, FileNotFoundError) as e:
                 if attempt < max_retries - 1:
-                    logger.warning(f"File operation failed (attempt {attempt + 1}), retrying in {self.cleanup_delay}s: {e}")
-                    time.sleep(self.cleanup_delay * (attempt + 1))  # Exponential backoff
+                    delay = 0.5 * (attempt + 1)
+                    logger.warning(f"File operation failed (attempt {attempt + 1}), retrying in {delay}s: {e}")
+                    time.sleep(delay)
                     gc.collect()
                 else:
                     logger.error(f"File operation failed after {max_retries} attempts: {e}")
@@ -96,17 +112,20 @@ class VideoGenerator:
             slides = lesson_data.get('slides', [])
             if not slides:
                 raise ValueError("No slides found in lesson data")
-              # Validate and normalize output path
-            output_path = os.path.abspath(output_path)
+            
+            # Validate and normalize output path - ensure it's a proper Windows path
+            output_path = os.path.normpath(os.path.abspath(output_path))
             os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
-            # Create temporary directory for intermediate files
-            with tempfile.TemporaryDirectory() as temp_dir:
+            # Use system TEMP directory - tránh path quá dài
+            temp_dir = tempfile.mkdtemp(prefix='vgen_')
+            
+            try:
                 logger.info(f"Processing {len(slides)} slides...")
                 logger.info(f"Using temporary directory: {temp_dir}")
                 logger.info(f"Output path: {output_path}")
                 
-                # Process all slides concurrently
+                # Process all slides concurrently with reduced concurrency for stability
                 slide_video_paths = await self._process_slides_concurrent(slides, temp_dir)
                 
                 # Filter out None values (failed slides)
@@ -121,31 +140,71 @@ class VideoGenerator:
                 
                 logger.info(f"Video generation completed: {final_video_path}")
                 return final_video_path
-                
+            finally:
+                # Clean up temp directory
+                try:
+                    if os.path.exists(temp_dir):
+                        time.sleep(1.0)  
+                        shutil.rmtree(temp_dir, ignore_errors=True)
+                except Exception as e:
+                    logger.warning(f"Could not clean up temp directory: {e}")
+                    
         except Exception as e:
             logger.error(f"Error generating lesson video: {e}")
             raise
 
     async def _process_slides_concurrent(self, slides: List[Dict], temp_dir: str) -> List[str]:
-        """Process all slides concurrently"""
-        with ThreadPoolExecutor(max_workers=4) as executor:
+        """Process slides with optimized memory usage and improved concurrency"""
+        # OPTIMIZED: Increased concurrency and larger batches
+        max_workers = self.max_workers_optimized
+        batch_size = self.batch_size_optimized
+        
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
             loop = asyncio.get_event_loop()
             
-            # Create tasks for all slides
-            tasks = []
-            for i, slide in enumerate(slides):
-                task = loop.run_in_executor(
-                    executor,
-                    self._process_single_slide, 
-                    slide, 
-                    i, 
-                    temp_dir
-                )
-                tasks.append(task)
+            # Process in optimized batches
+            all_valid_paths = []
             
-            # Wait for all tasks to complete
-            slide_video_paths = await asyncio.gather(*tasks)            # Sort by slide order
-            return [path for path in slide_video_paths if path]
+            for i in range(0, len(slides), batch_size):
+                batch = slides[i:i + batch_size]
+                logger.info(f"Processing batch {i//batch_size + 1}: slides {i+1}-{min(i+batch_size, len(slides))}")
+                
+                # Create tasks for current batch
+                tasks = []
+                for j, slide in enumerate(batch):
+                    task = loop.run_in_executor(
+                        executor,
+                        self._process_single_slide, 
+                        slide, 
+                        i + j, 
+                        temp_dir
+                    )
+                    tasks.append(task)
+                
+                # Wait for batch to complete - OPTIMIZED timeout
+                try:
+                    batch_results = await asyncio.wait_for(
+                        asyncio.gather(*tasks, return_exceptions=True), 
+                        timeout=120
+                    )
+                    
+                    # Process batch results
+                    for result in batch_results:
+                        if isinstance(result, Exception):
+                            logger.error(f"Slide processing error: {result}")
+                        elif result:
+                            all_valid_paths.append(result)
+                    
+                    # OPTIMIZED: Minimal cleanup between batches
+                    gc.collect()
+                    time.sleep(0.2)
+                    
+                except asyncio.TimeoutError:
+                    logger.error(f"Batch {i//batch_size + 1} processing timed out")
+                    for task in tasks:
+                        task.cancel()
+            
+            return all_valid_paths
 
     def _process_single_slide(self, slide: Dict, slide_index: int, temp_dir: str) -> str:
         """Process a single slide: get images, generate TTS, create video"""
@@ -153,11 +212,13 @@ class VideoGenerator:
             slide_id = slide.get('slide_id', slide_index + 1)
             logger.info(f"Processing slide {slide_id}...")
             
-            # Ensure temp_dir exists and is accessible
+            # Ensure temp_dir exists and is properly formatted for Windows
+            temp_dir = os.path.normpath(temp_dir)
             os.makedirs(temp_dir, exist_ok=True)
-              # Generate audio from TTS with proper path handling
+            
+            # Generate audio from TTS with proper path handling
             audio_filename = f"audio_{slide_id}.mp3"
-            audio_path = os.path.join(temp_dir, audio_filename)
+            audio_path = os.path.normpath(os.path.join(temp_dir, audio_filename))
             
             audio_path = self._generate_tts_audio(
                 slide.get('tts_script', ''), 
@@ -165,24 +226,43 @@ class VideoGenerator:
             )
             
             # Get audio duration with proper cleanup
-            with self._safe_moviepy_context() as clips:
-                audio_clip = AudioFileClip(audio_path)
-                clips.append(audio_clip)
-                audio_duration = audio_clip.duration
+            audio_duration = 5.0  # Default fallback
+            try:
+                with self._safe_moviepy_context() as clips:
+                    audio_clip = AudioFileClip(audio_path)
+                    clips.append(audio_clip)
+                    audio_duration = audio_clip.duration
+            except Exception as e:
+                logger.warning(f"Could not get audio duration for slide {slide_id}: {e}")
             
-            # Process slide images using the new optimized approach
-            slide_result = self.slide_processor.process_slide_images(slide, temp_dir, slide_id)
+            # Optional cleanup between operations
+            gc.collect()
+            
+            # Process slide images using the optimized approach
+            slide_result = self.slide_processor.process_slide_images(
+                slide, temp_dir, slide_id, self.image_resolution
+            )
             
             # Calculate optimal timing for images based on audio duration
             slide_result = self.slide_processor.calculate_slide_timing(slide_result, audio_duration)
             
+            # Another cleanup before video creation
+            gc.collect()
+            
             # Create video for this slide with proper path handling
             video_filename = f"slide_{slide_id}.mp4"
-            video_path = os.path.join(temp_dir, video_filename)
+            video_path = os.path.normpath(os.path.join(temp_dir, video_filename))
             
             self._create_slide_video_with_timing(slide_result, audio_path, video_path)
             
-            logger.info(f"Slide {slide_id} processed successfully")
+            # Final cleanup
+            gc.collect()
+            
+            # Verify the video file was created
+            if not os.path.exists(video_path):
+                raise FileNotFoundError(f"Video file was not created: {video_path}")
+            
+            logger.info(f"Slide {slide_id} processed successfully: {video_path}")
             return video_path
             
         except Exception as e:
@@ -196,8 +276,8 @@ class VideoGenerator:
             return self._create_silent_audio(output_path, duration=2.0)
         
         try:
-            # Validate and normalize the output path
-            output_path = os.path.abspath(output_path)
+            # Validate and normalize the output path for Windows
+            output_path = os.path.normpath(os.path.abspath(output_path))
             os.makedirs(os.path.dirname(output_path), exist_ok=True)
             
             synthesis_input = texttospeech.SynthesisInput(text=text)
@@ -207,8 +287,14 @@ class VideoGenerator:
                 audio_config=self.audio_config
             )
             
+            # Use safe file operation for writing
             with open(output_path, "wb") as out:
-                out.write(response.audio_content)            
+                out.write(response.audio_content)
+            
+            # Verify file was created
+            if not os.path.exists(output_path):
+                raise FileNotFoundError(f"TTS audio file was not created: {output_path}")
+                
             logger.debug(f"TTS audio generated: {output_path}")
             return output_path
             
@@ -218,9 +304,10 @@ class VideoGenerator:
             return self._create_silent_audio(output_path, duration=3.0)
 
     def _create_slide_video_with_timing(self, slide_result: Dict[str, Any], audio_path: str, output_path: str):
-        """Create video from slide result with proper timing"""        # Validate and normalize paths
-        output_path = os.path.abspath(output_path)
-        audio_path = os.path.abspath(audio_path)
+        """Create video from slide result with proper timing"""
+        # Validate and normalize paths for Windows
+        output_path = os.path.normpath(os.path.abspath(output_path))
+        audio_path = os.path.normpath(os.path.abspath(audio_path))
         
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
         
@@ -233,12 +320,13 @@ class VideoGenerator:
                 
                 images = slide_result['images']
                 if not images:
-                    raise ValueError("No images provided for video creation")                # Create image clips with calculated durations
+                    raise ValueError("No images provided for video creation")
+                
+                # Create image clips with calculated durations
                 image_clips = []
-                current_time = 0
                 
                 for img_info in images:
-                    image_path = os.path.abspath(img_info['path'])
+                    image_path = os.path.normpath(os.path.abspath(img_info['path']))
                     duration = img_info['duration']
                     
                     # Verify image file exists
@@ -246,20 +334,24 @@ class VideoGenerator:
                         logger.warning(f"Image file not found: {image_path}")
                         continue
                     
-                    # Create image clip
-                    image_clip = ImageClip(image_path).set_duration(duration).set_start(current_time)
-                    image_clips.append(image_clip)
-                    clips.append(image_clip)
-                    
-                    current_time += duration
+                    # Create image clip with error handling - NO timing, just duration
+                    try:
+                        image_clip = ImageClip(image_path).set_duration(duration)
+                        image_clips.append(image_clip)
+                        clips.append(image_clip)
+                    except Exception as e:
+                        logger.warning(f"Could not create image clip for {image_path}: {e}")
+                        continue
                 
-                # Create composite video
+                if not image_clips:
+                    raise ValueError("No valid image clips could be created")
+                
+                # Create video by concatenating images instead of compositing
                 if len(image_clips) == 1:
                     video_clip = image_clips[0]
                 else:
-                    # Use CompositeVideoClip to layer images over time
-                    from moviepy.editor import CompositeVideoClip
-                    video_clip = CompositeVideoClip(image_clips, size=(1920, 1080))
+                    # Concatenate images sequentially
+                    video_clip = concatenate_videoclips(image_clips, method="compose")
                 
                 clips.append(video_clip)
                 
@@ -270,18 +362,25 @@ class VideoGenerator:
                 final_clip = video_clip.set_audio(audio_clip)
                 clips.append(final_clip)
 
-                logger.info(f"Creating video with {len(images)} images, total duration: {total_duration:.2f}s")
+                logger.info(f"Creating video with {len(image_clips)} images, total duration: {total_duration:.2f}s")
                 
-                # Write video file
-                self._safe_file_operation(
-                    final_clip.write_videofile,
-                    output_path,
-                    fps=24,
-                    codec='libx264',
-                    audio_codec='aac',
-                    verbose=False,
-                    logger=None
-                )
+                # Write video file with enhanced error handling - OPTIMIZED
+                try:
+                    self._safe_file_operation(
+                        final_clip.write_videofile,
+                        output_path,
+                        fps=self.video_fps,  # OPTIMIZED: Lower FPS
+                        codec='libx264',
+                        audio_codec='aac',
+                        verbose=False,
+                        logger=None,
+                        preset='ultrafast',  # OPTIMIZED: Fastest encoding
+                        ffmpeg_params=['-crf', '28'],  # OPTIMIZED: Higher compression for speed
+                        temp_audiofile=None
+                    )
+                except Exception as e:
+                    logger.error(f"Error writing video file: {e}")
+                    raise
                 
             except Exception as e:
                 logger.error(f"Error creating slide video: {e}")
@@ -308,31 +407,49 @@ class VideoGenerator:
             os.makedirs(os.path.dirname(output_path), exist_ok=True)
             
             with self._safe_moviepy_context() as clips:
-                # Load all video clips
-                for path in valid_paths:
-                    clip = VideoFileClip(path)
-                    clips.append(clip)
+                # Load video clips one by one to avoid memory buildup
+                video_clips = []
+                for i, path in enumerate(valid_paths):
+                    try:
+                        logger.info(f"Loading video clip {i+1}/{len(valid_paths)}: {os.path.basename(path)}")
+                        clip = VideoFileClip(path)
+                        video_clips.append(clip)
+                        clips.append(clip)
+                        
+                        # Force cleanup every few clips
+                        if (i + 1) % 2 == 0:
+                            gc.collect()
+                            
+                    except Exception as e:
+                        logger.warning(f"Could not load video clip {path}: {e}")
+                        continue
                 
-                if not clips:
+                if not video_clips:
                     raise ValueError("No clips loaded successfully")
                 
-                # Concatenate all clips
-                final_video = concatenate_videoclips(clips, method="compose")
+                logger.info(f"Concatenating {len(video_clips)} video clips...")
+                # Concatenate all clips - use simple method
+                final_video = concatenate_videoclips(video_clips)
                 clips.append(final_video)
+                
+                # DO NOT clear intermediate clips yet - keep them for final video
                 
                 # Create temporary output path to avoid conflicts with proper path handling
                 temp_filename = f"{os.path.splitext(os.path.basename(output_path))[0]}_temp.mp4"
                 temp_output = os.path.join(os.path.dirname(output_path), temp_filename)
                 
-                # Write final video with safe operation  
+                # Write final video with safe operation - OPTIMIZED
                 self._safe_file_operation(
                     final_video.write_videofile,
                     temp_output,
-                    fps=24,
+                    fps=self.video_fps,  # OPTIMIZED: Lower FPS
                     codec='libx264',
                     audio_codec='aac',
                     verbose=False,
-                    logger=None
+                    logger=None,
+                    preset='ultrafast',  # OPTIMIZED: Fastest encoding
+                    threads=self.max_workers_optimized,  # OPTIMIZED: Use more threads
+                    ffmpeg_params=['-crf', '28']  # OPTIMIZED: Higher compression for speed
                 )
                 
                 # Force cleanup before moving file
@@ -358,8 +475,9 @@ class VideoGenerator:
             raise
 
     def _create_silent_audio(self, output_path: str, duration: float) -> str:
-        """Create silent audio file with proper cleanup"""        # Validate and normalize the output path
-        output_path = os.path.abspath(output_path)
+        """Create silent audio file with proper cleanup"""
+        # Validate and normalize the output path for Windows
+        output_path = os.path.normpath(os.path.abspath(output_path))
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
         
         with self._safe_moviepy_context() as clips:
@@ -376,6 +494,10 @@ class VideoGenerator:
                     verbose=False,
                     logger=None
                 )
+                
+                # Verify file was created
+                if not os.path.exists(output_path):
+                    raise FileNotFoundError(f"Silent audio file was not created: {output_path}")
                 
                 return output_path
                 

@@ -37,7 +37,7 @@ async def run_slide_creator(topic: str, subject: str = None, grade: str = None, 
 
         # Step 2: Build prompt messages
         prompt_messages = create_messages_for_llm(
-            topic=topic,
+            topic=f"{topic} (Môn: {subject}, Lớp: {grade})",
             uploaded_files_content=uploaded_files_content,
             rag_context=rag_context
         )
