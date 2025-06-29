@@ -3,12 +3,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from src.apis.routers.lesson_creator_router import router as router_rag_agent_template
 from src.apis.routers.file_processing_router import router as router_file_processing
 from src.apis.routers.vector_store_router import router as vector_store_router
+from src.apis.routers.video_generator_router import router as video_generator_router
 
 
 api_router = APIRouter()
 api_router.include_router(router_rag_agent_template)
 api_router.include_router(router_file_processing)
 api_router.include_router(vector_store_router)
+api_router.include_router(video_generator_router)
 
 
 def create_app():

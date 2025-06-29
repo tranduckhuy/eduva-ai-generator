@@ -1,3 +1,4 @@
+import os
 import asyncio
 import functools
 from src.utils.logger import logger
@@ -5,8 +6,9 @@ from .tools import retrieve_document
 from .func import create_slide_data
 from .prompt import create_messages_for_llm
 
+DEFAULT_MODEL = os.getenv("DEFAULT_MODEL")
 
-async def run_slide_creator(topic: str, subject: str = None, grade: str = None, uploaded_files_content: str = None, model_name: str = "gemini-2.5-flash-lite-preview-06-17"):
+async def run_slide_creator(topic: str, subject: str = None, grade: str = None, uploaded_files_content: str = None, model_name: str = DEFAULT_MODEL):
     """Simplified slide creator with essential features only"""
     try:
         logger.info(f"Creating slides for topic: {topic}, subject: {subject}, grade: {grade}")
@@ -35,7 +37,7 @@ async def run_slide_creator(topic: str, subject: str = None, grade: str = None, 
 
         # Step 2: Build prompt messages
         prompt_messages = create_messages_for_llm(
-            topic=topic,
+            topic=f"{topic} (Môn: {subject}, Lớp: {grade})",
             uploaded_files_content=uploaded_files_content,
             rag_context=rag_context
         )
