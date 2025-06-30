@@ -98,12 +98,10 @@ Content-Type: application/json
     "slides": [
       {
         "slide_id": 1,
-        "type": "title",
         "title": "Giới thiệu",
         "content": ["Nội dung slide 1"],
         "tts_script": "Script cho audio...",
         "image_keywords": ["classroom", "education"],
-        "estimated_duration_seconds": 10
       }
     ]
   },  "voice_config": {
