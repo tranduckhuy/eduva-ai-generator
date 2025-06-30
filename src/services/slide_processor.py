@@ -97,11 +97,11 @@ class SlideProcessor:
         if not images:
             return slide_result
         
-        # Ensure content image gets MAXIMUM time for comfortable reading
-        min_content_time = min(content_duration, audio_duration * 0.85)
+        # Ensure content image gets 80% of total audio time for comfortable reading
+        content_time = audio_duration * 0.80  # 80% of total time for content slide
         
         # Calculate remaining time for other images
-        remaining_time = audio_duration - min_content_time
+        remaining_time = audio_duration - content_time
         other_images = [img for img in images if img['type'] != 'content']
         
         if other_images and remaining_time > 0:
@@ -110,9 +110,9 @@ class SlideProcessor:
             # Update durations
             for img in images:
                 if img['type'] == 'content':
-                    img['duration'] = min_content_time
+                    img['duration'] = content_time
                 else:
-                    img['duration'] = max(2, time_per_other_image)  # Minimum 2s per image
+                    img['duration'] = max(1.5, time_per_other_image)  # Minimum 1.5s per image
         else:
             # Only content image, use full duration
             images[0]['duration'] = audio_duration

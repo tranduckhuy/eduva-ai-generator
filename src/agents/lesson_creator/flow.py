@@ -8,10 +8,10 @@ from .prompt import create_messages_for_llm
 
 DEFAULT_MODEL = os.getenv("DEFAULT_MODEL")
 
-async def run_slide_creator(topic: str, subject: str = None, grade: str = None, uploaded_files_content: str = None, model_name: str = DEFAULT_MODEL):
+async def run_slide_creator(topic: str, subject: str = None, grade: str = None, duration: str = None, uploaded_files_content: str = None, model_name: str = DEFAULT_MODEL):
     """Simplified slide creator with essential features only"""
     try:
-        logger.info(f"Creating slides for topic: {topic}, subject: {subject}, grade: {grade}")
+        logger.info(f"Creating slides for topic: {topic}, subject: {subject}, grade: {grade}, duration: {duration}")
           # Step 1: Retrieve documents from vector store với metadata filter
         # Run the synchronous retrieve_document.invoke in a thread pool to avoid blocking
         loop = asyncio.get_running_loop()
@@ -38,9 +38,12 @@ async def run_slide_creator(topic: str, subject: str = None, grade: str = None, 
         # Step 2: Build prompt messages
         prompt_messages = create_messages_for_llm(
             topic=f"{topic} (Môn: {subject}, Lớp: {grade})",
+            duration=duration,
             uploaded_files_content=uploaded_files_content,
             rag_context=rag_context
         )
+
+        logger.info(f"Prompt messages created with {len(prompt_messages)} messages")
         
         # Step 3: Generate slides with LLM
         from src.config.llm import get_llm

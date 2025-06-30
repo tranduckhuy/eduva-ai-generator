@@ -7,8 +7,9 @@ import tempfile
 from datetime import datetime
 
 from src.services.video_generator import VideoGenerator
+from src.services.tts_service import TTSService
 from src.agents.lesson_creator.flow import run_slide_creator
-from src.config.enums import SubjectEnum, GradeEnum
+from src.config.enums import SubjectEnum, GradeEnum, DurationEnum
 from langchain_community.document_loaders import PyMuPDFLoader, Docx2txtLoader, TextLoader
 from src.utils.logger import logger
 
@@ -27,7 +28,7 @@ class VoiceConfig(BaseModel):
 async def get_available_voices(language_code: Optional[str] = None):
     """Get available voices from Google Cloud TTS"""
     try:
-        voices = VideoGenerator.get_available_voices(language_code)
+        voices = TTSService.get_available_voices(language_code)
         return JSONResponse(content={
             "success": True,
             "voices": voices,
@@ -44,7 +45,7 @@ async def get_available_voices(language_code: Optional[str] = None):
 async def get_vietnamese_voices():
     """Get Vietnamese voices specifically"""
     try:
-        voices = VideoGenerator.get_available_voices("vi")
+        voices = TTSService.get_available_voices("vi")
         
         # Filter and organize Vietnamese voices
         vietnamese_voices = []
@@ -77,6 +78,7 @@ async def generate_video_from_topic(
     topic: str = Form(..., description="Chủ đề cần tạo video"),
     subject: Optional[SubjectEnum] = Form(None, description="Môn học"),
     grade: Optional[GradeEnum] = Form(None, description="Lớp (10, 11, 12)"),
+    duration: DurationEnum = Form(DurationEnum.DURATION_5_MIN, description="Thời lượng video mong muốn"),
     files: List[UploadFile] = File(None, description="Tài liệu tham khảo"),
     voice_name: Optional[str] = Form(None, description="Tên voice cụ thể (vd: vi-VN-Neural2-A)"),
     speaking_rate: float = Form(1.0, description="Tốc độ nói (0.25-4.0)")
@@ -124,9 +126,10 @@ async def generate_video_from_topic(
             topic=topic,
             subject=subject.value if subject else None,
             grade=grade.value if grade else None,
+            duration=duration.value,
             uploaded_files_content=uploaded_content if uploaded_content.strip() else None
         )
-        
+
         if not slide_result["success"]:
             return JSONResponse(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -181,6 +184,8 @@ async def generate_video_from_topic(
         # Tạo video và lưu tại output_path
         await video_generator.generate_lesson_video(lesson_data, output_path)
         
+        logger.info(f"Video generated successfully: {output_path}")
+
         # Trả về thông tin video (sau này bạn có thể thêm upload hoặc trả url)
         return JSONResponse(content={
             "success": True,
