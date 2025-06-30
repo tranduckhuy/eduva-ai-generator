@@ -69,6 +69,9 @@ class DurationEnum(str, Enum):
             if item.value.lower() == value.lower():
                 return item
         return None
+    
+    def to_minutes(self) -> int:
+        return int(self.value.split()[0])
 
 # Constants để sử dụng trong validation
 VALID_SUBJECTS = SubjectEnum.get_values()

@@ -322,6 +322,7 @@ class VideoGenerator:
                 
                 images = slide_result['images']
                 if not images:
+                    logger.error("No images provided for video creation - this should not happen")
                     raise ValueError("No images provided for video creation")
                 
                 # Create image clips with calculated durations

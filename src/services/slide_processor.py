@@ -71,18 +71,26 @@ class SlideProcessor:
 
         # Fallback if no images were created
         if not result['images']:
-            logger.warning(f"No images could be created for slide {slide_id}")
+            logger.warning(f"No images could be created for slide {slide_id}, creating fallback")
             try:
                 fallback_path = os.path.normpath(os.path.join(temp_dir, f"fallback_{slide_id}.jpg"))
-                self.image_generator.create_simple_fallback(title or "Slide", fallback_path, image_resolution)
-                if os.path.exists(fallback_path):
+                created_path = self.image_generator.create_simple_fallback(title or f"Slide {slide_id}", fallback_path, image_resolution)
+                if created_path and os.path.exists(created_path):
                     result['images'].append({
-                        'path': fallback_path,
+                        'path': created_path,
                         'type': 'fallback',
                         'duration': content_duration
                     })
+                    logger.info(f"Created fallback image for slide {slide_id}")
+                else:
+                    logger.error(f"Fallback image creation failed for slide {slide_id} - file not created")
             except Exception as e:
                 logger.error(f"Failed to create fallback image for slide {slide_id}: {e}")
+                
+        # Final safety check - if still no images, this is a critical error
+        if not result['images']:
+            logger.error(f"Critical error: No images could be created for slide {slide_id}")
+            raise ValueError(f"Failed to create any images for slide {slide_id}")
         result['total_images'] = len(result['images'])
         logger.info(f"⚡ Slide {slide_id} processed: {result['total_images']} images in fast mode")
         return result
@@ -95,6 +103,7 @@ class SlideProcessor:
         content_duration = slide_result['content_duration']
         
         if not images:
+            logger.warning("No images found for timing calculation")
             return slide_result
         
         # Ensure content image gets 80% of total audio time for comfortable reading
@@ -114,8 +123,10 @@ class SlideProcessor:
                 else:
                     img['duration'] = max(1.5, time_per_other_image)  # Minimum 1.5s per image
         else:
-            # Only content image, use full duration
-            images[0]['duration'] = audio_duration
+            # Only content image or no other images, use full duration
+            # Safely handle the case where images list might be empty
+            if images:
+                images[0]['duration'] = audio_duration
         
         # Verify total duration matches audio
         total_calculated = sum(img['duration'] for img in images)
@@ -128,8 +139,11 @@ class SlideProcessor:
         slide_result['images'] = images
         slide_result['total_duration'] = audio_duration
         
-        logger.debug(f"Slide timing calculated: {len(images)} images, "
-                    f"content: {images[0]['duration']:.1f}s, "
-                    f"total: {audio_duration:.1f}s")
+        if images:
+            logger.debug(f"Slide timing calculated: {len(images)} images, "
+                        f"content: {images[0]['duration']:.1f}s, "
+                        f"total: {audio_duration:.1f}s")
+        else:
+            logger.debug(f"Slide timing calculated: 0 images, total: {audio_duration:.1f}s")
         
         return slide_result

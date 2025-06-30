@@ -5,10 +5,8 @@ from typing import Sequence, Annotated
 from langchain_core.documents import Document
 from .tools import retrieve_document
 from src.utils.logger import logger
-from .prompt import system_prompt, create_prompt_messages
 
 tools = [retrieve_document]
-
 
 class State(TypedDict):
     messages: Annotated[Sequence[AnyMessage], add_messages]
@@ -58,18 +56,6 @@ def execute_tool(state: State):
         "messages": tool_messages,
     }
 
-
-async def generate_slide_content(state: State):
-    """Generate slide content using LLM"""
-    messages = state["messages"]
-    prompt_messages = create_prompt_messages(system_prompt, messages)
-    
-    from src.config.llm import llm_2_0
-    response = await llm_2_0.ainvoke(prompt_messages)
-    
-    return {"messages": [response]}
-
-
 def create_slide_data(ai_response: str) -> dict:
     """Create structured slide data from AI response"""
     try:
@@ -102,12 +88,10 @@ def create_basic_slides(content: str) -> dict:
     title = lines[0] if lines else "Bài học mới"
     slides.append({
         "slide_id": slide_id,
-        "type": "title",
         "title": title,
         "content": [title],
         "tts_script": f"Chào mừng các em đến với bài học về {title}",
         "image_keywords": ["education", "learning", "classroom", "students"],
-        "estimated_duration_seconds": 90
     })
     slide_id += 1
     
@@ -116,23 +100,18 @@ def create_basic_slides(content: str) -> dict:
     for i, line in enumerate(content_lines[:5]):
         slides.append({
             "slide_id": slide_id,
-            "type": "content", 
             "title": f"Nội dung {i + 1}",
             "content": [line],
             "tts_script": f"Chúng ta tìm hiểu về {line}. Đây là kiến thức quan trọng các em cần nắm vững.",
             "image_keywords": ["education", "textbook", "learning", "diagram"],
-            "estimated_duration_seconds": 120
         })
         slide_id += 1
-    
-    total_duration = sum(slide.get("estimated_duration_seconds", 90) for slide in slides) // 60
     
     return {
         "lesson_info": {
             "title": title,
             "slide_count": len(slides),
             "target_level": "Cấp 3 (lớp 10-12)",
-            "estimated_duration_minutes": total_duration
         },
         "slides": slides
     }

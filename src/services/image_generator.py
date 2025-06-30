@@ -143,19 +143,30 @@ class ImageGenerator:
     def create_simple_fallback(self, title: str, output_path: str, size: tuple = (1280, 720)):
         """Create ultra-simple fallback image"""
         try:
+            # Ensure output directory exists
+            os.makedirs(os.path.dirname(output_path), exist_ok=True)
+            
             image = Image.new('RGB', size, color='#34495e')
             draw = ImageDraw.Draw(image)
             try:
                 font = ImageFont.load_default()
                 text = title or "Slide"
+                # Wrap text if it's too long
+                if len(text) > 50:
+                    text = text[:47] + "..."
                 bbox = draw.textbbox((0, 0), text, font=font)
                 x = (size[0] - (bbox[2] - bbox[0])) // 2
                 y = (size[1] - (bbox[3] - bbox[1])) // 2
                 draw.text((x, y), text, font=font, fill='white')
-            except:
+            except Exception as font_error:
+                logger.warning(f"Font rendering failed: {font_error}")
+                # Still create the image without text
                 pass
-            os.makedirs(os.path.dirname(output_path), exist_ok=True)
+                
             image.save(output_path, 'JPEG', quality=80)
             image.close()
+            logger.debug(f"Simple fallback image created: {output_path}")
+            return output_path
         except Exception as e:
             logger.error(f"Simple fallback failed: {e}")
+            return None

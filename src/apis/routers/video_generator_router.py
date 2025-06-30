@@ -9,7 +9,6 @@ from datetime import datetime
 from src.services.video_generator import VideoGenerator
 from src.services.tts_service import TTSService
 from src.agents.lesson_creator.flow import run_slide_creator
-from src.config.enums import SubjectEnum, GradeEnum, DurationEnum
 from langchain_community.document_loaders import PyMuPDFLoader, Docx2txtLoader, TextLoader
 from src.utils.logger import logger
 
@@ -76,16 +75,13 @@ async def get_vietnamese_voices():
 @router.post("/generate-from-topic")
 async def generate_video_from_topic(
     topic: str = Form(..., description="Chủ đề cần tạo video"),
-    subject: Optional[SubjectEnum] = Form(None, description="Môn học"),
-    grade: Optional[GradeEnum] = Form(None, description="Lớp (10, 11, 12)"),
-    duration: DurationEnum = Form(DurationEnum.DURATION_5_MIN, description="Thời lượng video mong muốn"),
     files: List[UploadFile] = File(None, description="Tài liệu tham khảo"),
     voice_name: Optional[str] = Form(None, description="Tên voice cụ thể (vd: vi-VN-Neural2-A)"),
     speaking_rate: float = Form(1.0, description="Tốc độ nói (0.25-4.0)")
 ):
-    """API tạo video từ topic, tương tự slide-creator nhưng trả về video"""
+    """API tạo video từ topic với tính toán thời lượng tự động"""
     try:
-        logger.info(f"Generating video for: {topic}, subject: {subject}, grade: {grade}")
+        logger.info(f"Generating video for topic: {topic}")
         
         # Extract content from uploaded files (giống slide-creator)
         uploaded_content = ""
@@ -120,13 +116,10 @@ async def generate_video_from_topic(
                 except Exception as e:
                     logger.error(f"Error processing {file.filename}: {e}")
         
-        # Bước 1: Tạo slide data từ RAG
+        # Bước 1: Tạo slide data từ lesson creator (simplified)
         logger.info("Step 1: Creating slide data...")
         slide_result = await run_slide_creator(
             topic=topic,
-            subject=subject.value if subject else None,
-            grade=grade.value if grade else None,
-            duration=duration.value,
             uploaded_files_content=uploaded_content if uploaded_content.strip() else None
         )
 
@@ -137,9 +130,14 @@ async def generate_video_from_topic(
             )
         
         lesson_data = slide_result["slide_data"]
-          # Bước 2: Generate video từ slide data
+        lesson_info = lesson_data.get('lesson_info', {})
+        
+        logger.info(f"Created {lesson_info.get('slide_count', 0)} slides with {lesson_info.get('total_words', 0)} total words, estimated duration: {lesson_info.get('estimated_duration_minutes', 0):.1f} minutes")
+        
+        # Bước 2: Generate video từ slide data
         logger.info("Step 2: Generating video from slides...")
-          # Prepare voice configuration
+        
+        # Prepare voice configuration
         voice_config = {
             "language_code": "vi-VN",  # Fixed to Vietnamese
             "name": voice_name,
@@ -169,8 +167,7 @@ async def generate_video_from_topic(
         #         "video_info": {
         #             "filename": video_filename,
         #             "message": "Video generated successfully",
-        #             "slide_count": lesson_data.get('lesson_info', {}).get('slide_count', 0),
-        #             "estimated_duration": lesson_data.get('lesson_info', {}).get('estimated_duration_minutes', 0)
+        #             "slide_count": lesson_data.get('lesson_info', {}).get('slide_count', 0)
         #         }
         #         # In production: "video_url": azure_blob_url
         #     })
@@ -186,16 +183,17 @@ async def generate_video_from_topic(
         
         logger.info(f"Video generated successfully: {output_path}")
 
-        # Trả về thông tin video (sau này bạn có thể thêm upload hoặc trả url)
+        # Trả về thông tin video với thông tin chi tiết
         return JSONResponse(content={
             "success": True,
             "lesson_data": lesson_data,
             "video_info": {
                 "filename": video_filename,
-                "message": "Video generated successfully",
+                "message": f"Video generated successfully - {lesson_info.get('slide_count', 0)} slides, {lesson_info.get('estimated_duration_minutes', 0):.1f} minutes, {lesson_info.get('total_words', 0)} words",
                 "saved_path": output_path,  # Đường dẫn file video
-                "slide_count": lesson_data.get('lesson_info', {}).get('slide_count', 0),
-                "estimated_duration": lesson_data.get('lesson_info', {}).get('estimated_duration_minutes', 0)
+                "slide_count": lesson_info.get('slide_count', 0),
+                "total_words": lesson_info.get('total_words', 0),
+                "estimated_duration_minutes": lesson_info.get('estimated_duration_minutes', 0)
             }
         })
             

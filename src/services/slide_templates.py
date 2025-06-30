@@ -87,7 +87,7 @@ class ModernBlueTemplate(SlideTemplate):
         for i, content_item in enumerate(contents):
             content_lines = self.wrap_text(draw, content_item, content_font, size[0] - margin*2 - 40)
             is_child_content = content_item.startswith('- ')
-            for j, line in enumerate(content_lines[:2]):
+            for j, line in enumerate(content_lines):
                 if content_y > size[1] - 120:
                     break
                 x = margin
@@ -140,7 +140,7 @@ class MinimalGreenTemplate(SlideTemplate):
         for i, content_item in enumerate(contents):
             content_lines = self.wrap_text(draw, content_item, content_font, size[0] - margin*2 - 50)
             is_child_content = content_item.startswith('- ')
-            for j, line in enumerate(content_lines[:2]):
+            for j, line in enumerate(content_lines):
                 if content_y > size[1] - 80:
                     break
                 x = margin
@@ -194,7 +194,7 @@ class DarkModeTemplate(SlideTemplate):
         for i, content_item in enumerate(contents):
             content_lines = self.wrap_text(draw, content_item, content_font, size[0] - margin*2 - 60)
             is_child_content = content_item.startswith('- ')
-            for j, line in enumerate(content_lines[:2]):
+            for j, line in enumerate(content_lines):
                 if content_y > size[1] - 100:
                     break
                 x = margin
@@ -248,7 +248,7 @@ class CreativeOrangeTemplate(SlideTemplate):
         for i, content_item in enumerate(contents):
             content_lines = self.wrap_text(draw, content_item, content_font, size[0] - margin*2 - 40)
             is_child_content = content_item.startswith('- ')
-            for j, line in enumerate(content_lines[:2]):
+            for j, line in enumerate(content_lines):
                 if content_y > size[1] - 100:
                     break
                 x = margin
@@ -300,7 +300,7 @@ class CleanWhiteTemplate(SlideTemplate):
         for i, content_item in enumerate(contents):
             content_lines = self.wrap_text(draw, content_item, content_font, size[0] - margin*2 - 40)
             is_child_content = content_item.startswith('- ')
-            for j, line in enumerate(content_lines[:2]):
+            for j, line in enumerate(content_lines):
                 if content_y > size[1] - 80:
                     break
                 x = margin
@@ -370,7 +370,7 @@ class BlueAccentTemplate(SlideTemplate):
 
         # Content (Indented bullets)
         content_start_y = title_y + 80  # Reduced gap
-        content_x = title_x + 10
+        base_content_x = title_x + 10
         bullet_color = '#3B82F6'
         bullet_radius = 6
         content_color = '#E2E8F0'
@@ -378,18 +378,25 @@ class BlueAccentTemplate(SlideTemplate):
         for item in contents:
             wrapped = self.wrap_text(draw, item, content_font, size[0] - 2 * title_x - 100)
             if wrapped:
-                bullet_y = content_start_y + (content_font.getbbox(wrapped[0])[3] - content_font.getbbox(wrapped[0])[1]) // 2
-                draw.ellipse([
-                    content_x - 25 - bullet_radius,
-                    bullet_y - bullet_radius,
-                    content_x - 25 + bullet_radius,
-                    bullet_y + bullet_radius
-                ], fill=bullet_color)
+                # Reset content_x for each item
+                content_x = base_content_x
+                
+                if not item.startswith('- '):
+                    bullet_y = content_start_y + (content_font.getbbox(wrapped[0])[3] - content_font.getbbox(wrapped[0])[1]) // 2
+                    draw.ellipse([
+                        content_x - 25 - bullet_radius,
+                        bullet_y - bullet_radius,
+                        content_x - 25 + bullet_radius,
+                        bullet_y + bullet_radius
+                    ], fill=bullet_color)
+                    content_x += 15  # Indent for content after bullet
+                else:
+                    content_x += 15  # Indent for sub-items
 
-            for line in wrapped:
-                draw.text((content_x, content_start_y), line, font=content_font, fill=content_color)
-                content_start_y += content_font.getbbox(line)[3] - content_font.getbbox(line)[1] + 10
-            content_start_y += 20
+                for line in wrapped:
+                    draw.text((content_x, content_start_y), line, font=content_font, fill=content_color)
+                    content_start_y += content_font.getbbox(line)[3] - content_font.getbbox(line)[1] + 10
+                content_start_y += 20
 
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
         img.save(output_path, 'PNG', quality=95)
@@ -495,7 +502,7 @@ class NatureGreenTemplate(SlideTemplate):
         for i, content_item in enumerate(contents):
             content_lines = self.wrap_text(draw, content_item, content_font, size[0] - margin*2 - 40)
             is_child_content = content_item.startswith('- ')
-            for j, line in enumerate(content_lines[:2]):
+            for j, line in enumerate(content_lines):
                 if content_y > size[1] - 80:
                     break
                 x = margin
@@ -605,10 +612,12 @@ class ModernQuestionSlideTemplate(SlideTemplate):
             
             if lines:
                 # Bullet point
-                bullet_y = y_text + 8
-                draw.ellipse([x_text - 25, bullet_y, x_text - 10, bullet_y + 15], fill='#000000')
-
-                # Draw first line
+                if not full_text.startswith('- '):
+                    # Draw bullet point as a filled circle
+                    bullet_y = y_text + 8
+                    draw.ellipse([x_text - 25, bullet_y, x_text - 10, bullet_y + 15], fill='#000000')
+                
+                x_text += 20
                 draw.text((x_text, y_text), lines[0], font=content_font, fill='#000000')
                 y_text += content_font.getbbox(lines[0])[3] - content_font.getbbox(lines[0])[1] + line_spacing
 
