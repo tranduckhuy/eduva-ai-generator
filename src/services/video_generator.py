@@ -5,47 +5,28 @@ import time
 import platform
 from typing import List, Dict, Any
 from concurrent.futures import ThreadPoolExecutor
-from google.cloud import texttospeech
-from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips, VideoFileClip, AudioClip
+from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips, VideoFileClip, concatenate_audioclips
+from moviepy.audio.AudioClip import AudioArrayClip
+import numpy as np
 import tempfile
 import logging
 from contextlib import contextmanager
 import shutil
 
 # Import our new helper modules
-from .image_generator import ImageGenerator
 from .content_formatter import ContentFormatter
 from .slide_processor import SlideProcessor
+from .tts_service import TTSService
 
 logger = logging.getLogger(__name__)
 
 class VideoGenerator:
     def __init__(self, unsplash_access_key: str = None, voice_config: Dict[str, Any] = None):
-        # Initialize Google Cloud TTS client (credentials from environment)
-        self.tts_client = texttospeech.TextToSpeechClient()
+        # Initialize TTS service
+        self.tts_service = TTSService(voice_config)
         
         # Get Unsplash key from environment if not provided
         self.unsplash_access_key = unsplash_access_key or os.getenv('UNSPLASH_ACCESS_KEY')
-        
-        # Set voice configuration
-        if voice_config:
-            self.voice = texttospeech.VoiceSelectionParams(
-                language_code=voice_config.get('language_code', 'vi-VN'),
-                name=voice_config.get('name', 'vi-VN-Wavenet-D'),
-            )
-        else:
-            # Default voice
-            self.voice = texttospeech.VoiceSelectionParams(
-                language_code="vi-VN",
-                ssml_gender=texttospeech.SsmlVoiceGender.FEMALE
-            )
-        
-        # Audio configuration - OPTIMIZED
-        self.audio_config = texttospeech.AudioConfig(
-            audio_encoding=texttospeech.AudioEncoding.MP3,
-            speaking_rate=voice_config.get('speaking_rate', 1.1) if voice_config else 1.1,  # Faster speaking
-            sample_rate_hertz=22050  # Lower sample rate for smaller files and faster processing
-        )
         
         # Platform-specific settings - OPTIMIZED
         self.is_windows = platform.system() == "Windows"
@@ -125,7 +106,7 @@ class VideoGenerator:
                 logger.info(f"Using temporary directory: {temp_dir}")
                 logger.info(f"Output path: {output_path}")
                 
-                # Process all slides concurrently with reduced concurrency for stability
+                # Process all slides concurrently with reduced concurrency
                 slide_video_paths = await self._process_slides_concurrent(slides, temp_dir)
                 
                 # Filter out None values (failed slides)
@@ -269,39 +250,60 @@ class VideoGenerator:
             logger.error(f"Error processing slide {slide_index + 1}: {e}")
             return None
 
-    def _generate_tts_audio(self, text: str, output_path: str) -> str:
-        """Generate audio using Google Cloud TTS"""
+    def _generate_tts_audio(self, text: str, output_path: str, silence_duration: float = 0.8) -> str:
         if not text.strip():
-            # Create silent audio for empty text
-            return self._create_silent_audio(output_path, duration=2.0)
-        
+            return self.tts_service.create_silent_audio(output_path, duration=2.0)
+
         try:
-            # Validate and normalize the output path for Windows
-            output_path = os.path.normpath(os.path.abspath(output_path))
-            os.makedirs(os.path.dirname(output_path), exist_ok=True)
-            
-            synthesis_input = texttospeech.SynthesisInput(text=text)
-            response = self.tts_client.synthesize_speech(
-                input=synthesis_input,
-                voice=self.voice,
-                audio_config=self.audio_config
-            )
-            
-            # Use safe file operation for writing
-            with open(output_path, "wb") as out:
-                out.write(response.audio_content)
-            
-            # Verify file was created
-            if not os.path.exists(output_path):
-                raise FileNotFoundError(f"TTS audio file was not created: {output_path}")
-                
-            logger.debug(f"TTS audio generated: {output_path}")
-            return output_path
-            
+            # Generate TTS audio first
+            path = self.tts_service.synthesize_text(text, output_path)
+
+            # Add silence at the end if requested
+            if silence_duration > 0:
+                try:
+                    # Create silence audio in memory - thread-safe and efficient
+                    # This avoids concurrent access issues completely
+                    
+                    # Load original audio
+                    audio = AudioFileClip(path)
+                    
+                    # Create silence clip in memory - no file needed
+                    fps = 44100  # Standard sample rate
+                    channels = 2  # Stereo
+                    silence_samples = np.zeros((int(silence_duration * fps), channels), dtype=np.float32)
+                    silence = AudioArrayClip(silence_samples, fps=fps)
+
+                    # Create temporary path for final audio to avoid overwriting during process
+                    temp_output = f"{os.path.splitext(path)[0]}_temp.mp3"
+                    
+                    # Concatenate audio with silence
+                    final = concatenate_audioclips([audio, silence])
+                    
+                    # Write to temporary file first
+                    final.write_audiofile(temp_output, codec="libmp3lame", logger=None, verbose=False)
+
+                    # Close all clips to release resources
+                    audio.close()
+                    silence.close()
+                    final.close()
+                    
+                    # Replace original file with the new one
+                    if os.path.exists(temp_output):
+                        if os.path.exists(path):
+                            os.remove(path)
+                        os.rename(temp_output, path)
+                    
+                    logger.debug(f"Added {silence_duration}s silence to audio: {path}")
+                    
+                except Exception as silence_error:
+                    logger.warning(f"Could not add silence to audio: {silence_error}")
+                    # If silence addition fails, continue with original audio
+
+            return path
+
         except Exception as e:
-            logger.error(f"Error generating TTS audio: {e}")
-            # Fallback to silent audio
-            return self._create_silent_audio(output_path, duration=3.0)
+            logger.error(f"TTS error: {e}")
+            return self.tts_service.create_silent_audio(output_path, duration=3.0)
 
     def _create_slide_video_with_timing(self, slide_result: Dict[str, Any], audio_path: str, output_path: str):
         """Create video from slide result with proper timing"""
@@ -474,60 +476,3 @@ class VideoGenerator:
                 logger.warning(f"Could not clean up temp file: {cleanup_error}")
             raise
 
-    def _create_silent_audio(self, output_path: str, duration: float) -> str:
-        """Create silent audio file with proper cleanup"""
-        # Validate and normalize the output path for Windows
-        output_path = os.path.normpath(os.path.abspath(output_path))
-        os.makedirs(os.path.dirname(output_path), exist_ok=True)
-        
-        with self._safe_moviepy_context() as clips:
-            try:
-                def make_frame(t):
-                    return [0, 0]  # Stereo silence
-                
-                audio_clip = AudioClip(make_frame, duration=duration)
-                clips.append(audio_clip)
-                
-                self._safe_file_operation(
-                    audio_clip.write_audiofile,
-                    output_path,
-                    verbose=False,
-                    logger=None
-                )
-                
-                # Verify file was created
-                if not os.path.exists(output_path):
-                    raise FileNotFoundError(f"Silent audio file was not created: {output_path}")
-                
-                return output_path
-                
-            except Exception as e:
-                logger.error(f"Error creating silent audio: {e}")
-                raise
-
-    @staticmethod
-    def get_available_voices(language_code: str = None) -> List[Dict[str, Any]]:
-        """Get available voices from Google Cloud TTS"""
-        try:
-            client = texttospeech.TextToSpeechClient()
-            voices = client.list_voices(language_code=language_code)
-            
-            voice_list = []
-            for voice in voices.voices:
-                for lang_code in voice.language_codes:
-                    if not language_code or lang_code.startswith(language_code):
-                        voice_info = {
-                            "name": voice.name,
-                            "language_code": lang_code,
-                            "gender": voice.ssml_gender.name,
-                            "natural_sample_rate": voice.natural_sample_rate_hertz
-                        }
-                        voice_list.append(voice_info)
-            
-            return voice_list
-            
-        except Exception as e:
-            logger.error(f"Error getting available voices: {e}")
-            return []
-  
-    

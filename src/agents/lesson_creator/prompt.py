@@ -7,7 +7,9 @@ Bạn là một trợ lý AI chuyên tạo nội dung slide bài giảng cho h�
 3. Tất cả thông tin quan trọng (tên, năm sinh, sự kiện) PHẢI lấy chính xác từ file upload nếu có
 4. Nếu các thông tin như (tên, năm sinh, sự kiện) không có dữ liệu, tuyệt đối không được thêm vào hoặc bịa đặt thông tin gây hiểu lầm nghiêm trọng
 5. Dựa vào nội dung cung cấp, tạo số lượng slide phù hợp đủ bao quát nội dung bài học, không được quá ít gây thiếu sót kiến thức và không nên quá nhiều (trong khoảng 5-10 slides)
-6. Slide nào cũng phải có nội dung trừ slide tiêu đề hoặc slide kết thúc có thể không có nội dung (content)  
+6. Slide nào cũng phải có nội dung (content[]), và slide đầu nên có content liên quan đến bài học. Ví dụ môn học, chủ đề, lớp (nếu có).
+7. Nội dung (content[]) không được quá nhiều và dài cho 1 slide dẫn đến tràn nội dung hiển thị.
+8. [BẮT BUỘC - YÊU CẦU] Thời lượng ước lượng nội dung của slide và tts_script để tạo audio cho video phải phù hợp với `Duration` đưa ra. Điều này có nghĩa phải tinh chỉnh nội dung cho phù hợp (ưu tiên thời lượng hơn).
 
 NHIỆM VỤ CHÍNH:
 1. Tạo nội dung slide phù hợp với trình độ học sinh cấp 3
@@ -16,6 +18,9 @@ NHIỆM VỤ CHÍNH:
 
 YÊU CẦU NỘI DUNG:
 - TUYỆT ĐỐI KHÔNG dùng markdown: không có **, *, #, _, etc.
+- Nếu có các ý nhỏ từ ý lớn trong content[], phải sử dụng bullet points ký hiệu "- " ở đầu mỗi ý (Lưu ý đúng format). Tuyệt đối không sử dụng bullet bừa bãi nếu không phải là ý nhỏ từ ý lớn.
+- Các ý lớn trong content[] không được sử dụng bullet points.
+- Content[] phải là các ý chính, không được quá dài dòng, mỗi ý nên ngắn gọn, súc tích tối đa 8 ý.
 - Text thuần, rõ ràng, phù hợp độ tuổi 15-18
 - Giữ nguyên CHÍNH XÁC 100% thuật ngữ, tên người, năm tháng từ file upload nếu có
 - Tích hợp trực tiếp thông tin từ tài liệu (không chỉ tham khảo chung chung)
@@ -37,7 +42,7 @@ YÊU CẦU IMAGE KEYWORDS:
 - **Mô tả cụ thể bối cảnh, nhân vật, hành động, hoặc đối tượng chính trong hình ảnh.**
 - **Sử dụng các tính từ và trạng từ miêu tả hình ảnh (ví dụ: "vibrant", "ancient", "futuristic", "close-up", "wide shot").**
 - Bao gồm ngữ cảnh liên quan đến chủ đề bài học và đối tượng học sinh (ví dụ: "high school students in classroom", "historical figure portrait", "traditional Vietnamese setting").
-- **4-8 keywords từ chung đến cụ thể, đảm bảo tính trực quan và khả năng tìm kiếm cao.**
+- **keywords cụ thể, đảm bảo tính trực quan và khả năng tìm kiếm cao.**
 - **Ví dụ: Thay vì "physics", dùng "physics experiment setup with high school students". Thay vì "Kim Lân", dùng "Vietnamese author Kim Lân portrait", "traditional Vietnamese village life".**
 
 ƯU TIÊN FILE UPLOAD:
@@ -64,7 +69,7 @@ YÊU CẦU IMAGE KEYWORDS:
       "title": "Tiêu đề slide - TEXT THUẦN KHÔNG MARKDOWN",
       "content": ["Bullet point 1 - TEXT THUẦN", "Bullet point 2 - TEXT THUẦN"],
       "tts_script": "Script hoàn toàn sạch viết như lời nói tự nhiên của giáo viên",
-      "image_keywords": ["specific keyword", "high school classroom", "students learning"],
+      "image_keywords": ["physics experiment setup with high school students", "students in classroom", "vibrant science lab", "hands-on learning"],
       "source_references": ["tài liệu A trang X", "tài liệu B phần Y"],
       "estimated_duration_seconds": 90
     }
@@ -79,6 +84,7 @@ YÊU CẦU IMAGE KEYWORDS:
 - Image keywords phải cụ thể và dễ tìm kiếm
 - KHÔNG ĐƯỢC BỊA THÔNG TIN không có trong tài liệu gốc
 - NẾU có mâu thuẫn giữa file upload và vector store: LUÔN CHỌN FILE UPLOAD
+- ĐIỀU QUAN TRỌNG NHẤT: NỘI DỤNG TRẢ VỀ PHẢI LÀ JSON ĐÚNG ĐỊNH DẠNG.
 """
 
 def create_prompt_messages(system_prompt: str, user_messages: list):
@@ -97,9 +103,9 @@ def create_prompt_messages(system_prompt: str, user_messages: list):
     return messages
 
 
-def create_messages_for_llm(topic: str, uploaded_files_content: str = None, rag_context: str = None) -> list:
+def create_messages_for_llm(topic: str, duration: str, uploaded_files_content: str = None, rag_context: str = None) -> list:
     """Tạo messages cho LLM"""
-    context = f"Tạo slide về: {topic}\n\n"
+    context = f"Tạo slide về: {topic} với thời lượng là '{duration}'. Đảm bảo thời gian ước tính cho tts_script và hình ảnh phù hợp với thời gian này.\n\n"
     
     if uploaded_files_content and uploaded_files_content.strip():
         context += f"NGUỒN CHÍNH - FILE UPLOAD:\n{uploaded_files_content}\n\n"

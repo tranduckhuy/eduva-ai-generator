@@ -16,10 +16,7 @@ class SubjectEnum(str, Enum):
     SINH = "Sinh"
     SU = "Sử"
     DIA = "Địa"
-    GDCD = "GDCD"
     CONG_NGHE = "Công nghệ"
-    GDTC = "GDTC"
-    GDQP = "GDQP"
 
     @classmethod
     def get_values(cls):
@@ -54,6 +51,26 @@ class GradeEnum(str, Enum):
                 return item
         return None
 
+class DurationEnum(str, Enum):
+    DURATION_3_MIN = "3 phút"
+    DURATION_5_MIN = "5 phút"
+    DURATION_10_MIN = "10 phút"
+    DURATION_15_MIN = "15 phút"
+
+    @classmethod
+    def get_values(cls):
+        """Trả về list các giá trị để validation"""
+        return [item.value for item in cls]
+
+    @classmethod
+    def from_string(cls, value: str):
+        """Convert string to enum, return None if invalid"""
+        for item in cls:
+            if item.value.lower() == value.lower():
+                return item
+        return None
+
 # Constants để sử dụng trong validation
 VALID_SUBJECTS = SubjectEnum.get_values()
 VALID_GRADES = GradeEnum.get_values()
+VALID_DURATIONS = DurationEnum.get_values()
