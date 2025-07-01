@@ -62,6 +62,7 @@ async def create_slides(
         if result["success"]:
             slide_data = result["slide_data"]
             lesson_info = slide_data.get('lesson_info', {})
+            
             return JSONResponse(content={
                 "success": True,
                 "slide_data": slide_data,
