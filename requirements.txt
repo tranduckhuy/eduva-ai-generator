@@ -27,3 +27,6 @@ Pillow
 requests
 aiohttp
 asyncio
+pika
+azure-storage-blob
+azure-identity

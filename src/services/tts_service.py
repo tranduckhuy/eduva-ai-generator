@@ -117,6 +117,23 @@ class TTSService:
                     pass
             raise
     
+    async def generate_audio(self, text: str, output_path: str) -> str:
+        """
+        Generate audio from text (async wrapper for synchronous method)
+        
+        Args:
+            text: Text to convert to speech
+            output_path: Path to save the audio file
+            
+        Returns:
+            str: Path to the generated audio file
+        """
+        import asyncio
+        
+        # Run the synchronous method in a thread pool
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, self.synthesize_text, text, output_path)
+    
     def create_silent_audio(self, output_path: str, duration: float = 2.0) -> str:
         """Create a silent audio file"""
         try:
