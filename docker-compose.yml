@@ -1,0 +1,34 @@
+version: "3.8"
+
+services:
+  # AI Worker only - connects to external RabbitMQ
+  ai-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ai-worker
+    environment:
+      # RabbitMQ Configuration (external)
+      RABBITMQ_URI: ${RABBITMQ_URI}
+
+      # Queue Configuration
+      AI_TASK_QUEUE: ${AI_TASK_QUEUE}
+      DLQ_QUEUE: ${DLQ_QUEUE}
+
+      # Azure Configuration
+      AZURE_STORAGE_CONNECTION_STRING: ${AZURE_STORAGE_CONNECTION_STRING}
+      AZURE_INPUT_CONTAINER: ${AZURE_INPUT_CONTAINER}
+      AZURE_OUTPUT_CONTAINER: ${AZURE_OUTPUT_CONTAINER}
+
+      # Backend API Configuration
+      BACKEND_API_BASE_URL: ${BACKEND_API_BASE_URL}
+      BACKEND_API_KEY: ${BACKEND_API_KEY}
+
+      # AI Service Configuration
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY}
+      DEFAULT_MODEL: ${DEFAULT_MODEL}
+      GOOGLE_APPLICATION_CREDENTIALS: ${GOOGLE_APPLICATION_CREDENTIALS}
+      UNSPLASH_ACCESS_KEY: ${UNSPLASH_ACCESS_KEY}
+      PEXELS_ACCESS_KEY: ${PEXELS_ACCESS_KEY}
+
+    restart: unless-stopped

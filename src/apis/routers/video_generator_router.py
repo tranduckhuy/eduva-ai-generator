@@ -220,17 +220,39 @@ async def generate_video_from_slides(request: VideoFromSlideDataRequest):
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         video_filename = f"lesson_{timestamp}.mp4"
         
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        output_dir = os.path.join(base_dir, "temp_videos")
+        os.makedirs(output_dir, exist_ok=True)
+        
+        output_path = os.path.join(output_dir, video_filename)
+        
+        # Tạo video và lưu tại output_path
+        await video_generator.generate_lesson_video(request.lesson_data, output_path)
+        
+        logger.info(f"Video generated successfully: {output_path}")
+
         # Create temp directory for video
-        with tempfile.TemporaryDirectory() as temp_dir:
-            temp_video_path = os.path.join(temp_dir, video_filename)
+        # with tempfile.TemporaryDirectory() as temp_dir:
+        #     temp_video_path = os.path.join(temp_dir, video_filename)
             
-            # Generate video
-            await video_generator.generate_lesson_video(request.lesson_data, temp_video_path)
+        #     # Generate video
+        #     await video_generator.generate_lesson_video(request.lesson_data, temp_video_path)
             
-            # TODO: Upload to Azure or return video data
-            # For now, we'll return success message
+        #     # TODO: Upload to Azure or return video data
+        #     # For now, we'll return success message
             
-            return JSONResponse(content={
+        #     return JSONResponse(content={
+        #         "success": True,
+        #         "video_info": {
+        #             "filename": video_filename,
+        #             "message": "Video generated successfully from slide data",
+        #             "slide_count": len(request.lesson_data.get('slides', [])),
+        #             "title": request.lesson_data.get('lesson_info', {}).get('title', 'Unknown')
+        #         }
+        #         # In production: "video_url": azure_blob_url
+        #     })
+        
+        return JSONResponse(content={
                 "success": True,
                 "video_info": {
                     "filename": video_filename,

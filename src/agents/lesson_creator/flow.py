@@ -16,8 +16,6 @@ async def run_slide_creator(topic: str, uploaded_files_content: str = None, mode
             uploaded_files_content=uploaded_files_content
         )
 
-        logger.info(f"Prompt messages created with {len(prompt_messages)} messages")
-        
         # Step 2: Generate slides with LLM
         from src.config.llm import get_llm
         llm = get_llm(model_name)
@@ -28,13 +26,29 @@ async def run_slide_creator(topic: str, uploaded_files_content: str = None, mode
         # Step 3: Parse response and create slide data
         slide_data = create_slide_data(response.content)
         
-        # Step 4: Add basic metadata
+        # Step 4: Add basic metadata and calculate word counts
         if slide_data and "lesson_info" in slide_data:
             lesson_info = slide_data["lesson_info"]
             lesson_info["primary_source"] = "file_upload" if uploaded_files_content else "generated_content"
             lesson_info["target_level"] = "Cấp 3 (lớp 10-12)"
+            
+            # Calculate word counts and duration from tts_script
+            slides = slide_data.get('slides', [])
+            total_words = 0
+            
+            for slide in slides:
+                tts_script = slide.get('tts_script', '')
+                word_count = len(tts_script.split()) if tts_script else 0
+                total_words += word_count
+            
+            # Calculate estimated duration (180 words per minute)
+            estimated_duration_minutes = total_words / 180
+            
+            # Update lesson_info with calculated values
+            lesson_info['total_words'] = total_words
+            lesson_info['estimated_duration_minutes'] = round(estimated_duration_minutes, 1)
         
-        logger.info(f"Successfully created slides with {slide_data.get('lesson_info', {}).get('slide_count', 0)} slides")
+        logger.info(f"Successfully created slides with {slide_data.get('lesson_info', {}).get('slide_count', 0)} slides, {slide_data.get('lesson_info', {}).get('total_words', 0)} words, duration: {slide_data.get('lesson_info', {}).get('estimated_duration_minutes', 0):.1f} minutes")
         
         return {
             "success": True,

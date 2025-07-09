@@ -2,7 +2,6 @@ from langchain_core.tools import tool
 from src.config.vector_store import vector_store
 from src.utils.helper import convert_list_context_source_to_str
 from src.utils.logger import logger
-from src.config.enums import VALID_SUBJECTS, VALID_GRADES
 
 @tool
 def retrieve_document(query: str, subject: str = None, grade: str = None):
@@ -13,21 +12,8 @@ def retrieve_document(query: str, subject: str = None, grade: str = None):
         subject: Môn học để filter metadata (Toán, Văn, Anh, Lý, Hóa, Sinh, Sử, Địa, GDCD, Công nghệ, GDTC, GDQP)
         grade: Lớp/cấp để filter metadata (10, 11, 12)
     """
-    # Validate inputs
-    if subject and subject not in VALID_SUBJECTS:
-        logger.warning(f"Invalid subject '{subject}'. Valid subjects: {VALID_SUBJECTS}")
-        subject = None
-    
-    if grade and grade not in VALID_GRADES:
-        logger.warning(f"Invalid grade '{grade}'. Valid grades: {VALID_GRADES}")
-        grade = None
-    
     # Build metadata filter
     metadata_filter = {}
-    if subject:
-        metadata_filter["subject"] = subject
-    if grade:
-        metadata_filter["grade"] = grade
     
     # Configure search kwargs with filter
     search_kwargs = {"k": 7, "score_threshold": 0.25}
