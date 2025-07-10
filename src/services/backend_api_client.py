@@ -3,6 +3,7 @@ Backend API client for communicating with C# backend
 """
 import asyncio
 import json
+import ssl
 from typing import Dict, Any, Optional
 import aiohttp
 from src.utils.logger import logger
@@ -13,14 +14,41 @@ class BackendApiClient:
     """Client for communicating with the C# backend API"""
     
     def __init__(self, base_url: str, api_key: Optional[str] = None):
-        """Initialize backend API client"""
+        """
+        Initialize backend API client
+        
+        Args:
+            base_url: Base URL for the backend API
+            api_key: API key for authentication
+        """
         self.base_url = base_url.rstrip('/')
         self.api_key = api_key
+        # Auto-detect SSL verification: disable for localhost, enable for production
+        self.verify_ssl = not (
+            'localhost' in base_url.lower() or 
+            '127.0.0.1' in base_url or 
+            base_url.startswith('https://192.168.') or
+            base_url.startswith('https://10.') or
+            base_url.startswith('https://172.')
+        )
         self.session = None
+        
+        if not self.verify_ssl:
+            logger.warning(f"SSL verification disabled for {base_url} - detected development environment")
     
     async def __aenter__(self):
         """Async context manager entry"""
-        self.session = aiohttp.ClientSession()
+        # Create SSL context based on verification setting
+        ssl_context = None
+        if not self.verify_ssl:
+            ssl_context = ssl.create_default_context()
+            ssl_context.check_hostname = False
+            ssl_context.verify_mode = ssl.CERT_NONE
+            logger.warning("SSL certificate verification disabled - only use in development!")
+        
+        # Create connector with SSL settings
+        connector = aiohttp.TCPConnector(ssl=ssl_context)
+        self.session = aiohttp.ClientSession(connector=connector)
         return self
     
     async def __aexit__(self, exc_type, exc_val, exc_tb):
@@ -40,6 +68,21 @@ class BackendApiClient:
         
         return headers
     
+    async def _ensure_session(self):
+        """Ensure session is created with proper SSL settings"""
+        if not self.session:
+            # Create SSL context based on verification setting
+            ssl_context = None
+            if not self.verify_ssl:
+                ssl_context = ssl.create_default_context()
+                ssl_context.check_hostname = False
+                ssl_context.verify_mode = ssl.CERT_NONE
+                logger.warning("SSL certificate verification disabled - only use in development!")
+            
+            # Create connector with SSL settings
+            connector = aiohttp.TCPConnector(ssl=ssl_context)
+            self.session = aiohttp.ClientSession(connector=connector)
+    
     async def update_job_status(self, job_id: str, status_data: Dict[str, Any]) -> bool:
         """
         Update job status via PUT request to /api/ai-jobs/{id}/progress
@@ -54,8 +97,7 @@ class BackendApiClient:
         url = f"{self.base_url}/api/ai-jobs/{job_id}/progress"
         
         try:
-            if not self.session:
-                self.session = aiohttp.ClientSession()
+            await self._ensure_session()
             
             logger.info(f"Updating job {job_id} progress: {status_data}")
             
@@ -89,10 +131,11 @@ class BackendApiClient:
         Returns:
             bool: True if successful, False otherwise
         """
-        # Map to backend API structure
+        # Map to backend API structure  
         status_data = {
             "jobStatus": status.value,  # Send enum value (number)
             "wordCount": kwargs.get("wordCount"),
+            "previewContent": kwargs.get("previewContent"),
             "contentBlobName": kwargs.get("contentBlobName"),
             "productBlobName": kwargs.get("productBlobName")
         }
@@ -137,8 +180,7 @@ class BackendApiClient:
         url = f"{self.base_url}/api/ai-jobs/{job_id}"
         
         try:
-            if not self.session:
-                self.session = aiohttp.ClientSession()
+            await self._ensure_session()
             
             async with self.session.get(
                 url,

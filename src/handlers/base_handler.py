@@ -21,7 +21,10 @@ class BaseTaskHandler(ABC):
         """Initialize base task handler"""
         self.config = config
         self.azure_service = AzureBlobService(config.azure_storage_connection_string)
-        self.backend_client = BackendApiClient(config.backend_api_base_url, config.backend_api_key)
+        self.backend_client = BackendApiClient(
+            config.backend_api_base_url, 
+            config.backend_api_key
+        )
     
     @abstractmethod
     async def process(self, message: TaskMessage) -> bool:
