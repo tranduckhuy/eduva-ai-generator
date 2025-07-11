@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   # AI Worker only - connects to external RabbitMQ
   ai-worker:
@@ -10,10 +8,16 @@ services:
     environment:
       # RabbitMQ Configuration (external)
       RABBITMQ_URI: ${RABBITMQ_URI}
-
-      # Queue Configuration
       AI_TASK_QUEUE: ${AI_TASK_QUEUE}
       DLQ_QUEUE: ${DLQ_QUEUE}
+      DLQ_EXCHANGE: ${DLQ_EXCHANGE}
+      MAIN_EXCHANGE: ${MAIN_EXCHANGE}
+      ROUTING_KEY: ${ROUTING_KEY}
+
+      #
+      DLQ_MONITORING_ENABLED: ${DLQ_MONITORING_ENABLED}
+      DLQ_ALERT_THRESHOLD: ${DLQ_ALERT_THRESHOLD}
+      MAX_RETRIES: ${MAX_RETRIES}
 
       # Azure Configuration
       AZURE_STORAGE_CONNECTION_STRING: ${AZURE_STORAGE_CONNECTION_STRING}
