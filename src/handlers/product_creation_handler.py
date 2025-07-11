@@ -10,6 +10,9 @@ from src.models.task_messages import CreateProductMessage, JobType
 from src.services.video_generator import VideoGenerator
 from src.config.job_status import JobStatus
 from src.utils.logger import logger
+from src.services.tts_service import TTSService
+from src.services.tts_service import TTSService
+from moviepy.editor import concatenate_audioclips, AudioFileClip
 
 
 class ProductCreationHandler(BaseTaskHandler):
@@ -155,80 +158,72 @@ class ProductCreationHandler(BaseTaskHandler):
         lesson_content: Dict[str, Any]
     ) -> str:
         """
-        Generate audio from lesson content
-        
-        Args:
-            message: Product creation message
-            lesson_content: Lesson content data
-            
-        Returns:
-            str: Path to the generated audio file
+        Generate audio from lesson content (simplified version)
         """
         try:
-            from src.services.tts_service import TTSService
-            from moviepy.editor import concatenate_audioclips, AudioFileClip
-            import tempfile
-            
-            # Prepare voice configuration
-            voice_config = message.voiceConfig or {}
-            
-            # Set default voice config if not provided
-            if not voice_config:
-                voice_config = {
-                    "language_code": "vi-VN",
-                    "name": "vi-VN-Neural2-A",
-                    "speaking_rate": 1.0
-                }
-            
-            # Initialize TTS service
+            # Voice config
+            voice_config = message.voiceConfig or {
+                "language_code": "vi-VN",
+                "name": "vi-VN-Neural2-A",
+                "speaking_rate": 1.0
+            }
+
             tts_service = TTSService(voice_config)
-            
-            # Generate output path
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            output_filename = f"audio_{message.jobId}_{timestamp}.mp3"
-            output_path = os.path.join(self.config.temp_dir, output_filename)
-            
-            # Collect all TTS scripts from slides
+            output_path = os.path.join(self.config.temp_dir, f"audio_{message.jobId}_{timestamp}.mp3")
+
+            # Process slides
             slides = lesson_content.get("slides", [])
-            audio_clips = []
-            temp_audio_files = []
-            
-            try:
-                for i, slide in enumerate(slides):
-                    tts_script = slide.get("tts_script", "")
-                    if tts_script.strip():
-                        # Generate audio for this slide
-                        temp_audio_path = os.path.join(
-                            self.config.temp_dir, 
-                            f"slide_audio_{i}_{timestamp}.mp3"
-                        )
-                        
-                        await tts_service.generate_audio(tts_script, temp_audio_path)
-                        
-                        # Load audio clip
-                        audio_clip = AudioFileClip(temp_audio_path)
-                        audio_clips.append(audio_clip)
-                        temp_audio_files.append(temp_audio_path)
+            chunks = []
+            current_chunk = []
+            current_size = 0
+
+            for slide in slides:
+                text = slide.get("tts_script", "").strip()
+                if not text:
+                    continue
+
+                text_bytes = len(text.encode('utf-8'))
                 
-                if audio_clips:
-                    # Concatenate all audio clips
-                    final_audio = concatenate_audioclips(audio_clips)
-                    final_audio.write_audiofile(output_path)
-                    final_audio.close()
-                    
-                    # Close individual clips
-                    for clip in audio_clips:
-                        clip.close()
+                if current_size + text_bytes > 5000:
+                    if current_chunk:
+                        chunks.append(". ".join(current_chunk))
+                    current_chunk = [text]
+                    current_size = text_bytes
                 else:
-                    raise ValueError("No audio content found in lesson slides")
-                
-            finally:
-                # Clean up temporary audio files
-                self.cleanup_temp_files(*temp_audio_files)
+                    current_chunk.append(text)
+                    current_size += text_bytes
+
+            # Thêm chunk cuối cùng
+            if current_chunk:
+                chunks.append(". ".join(current_chunk))
+
+            if not chunks:
+                raise ValueError("No audio content found")
+
+            # Generate audio từ các chunks
+            temp_files = []
+            for i, chunk in enumerate(chunks):
+                temp_path = os.path.join(self.config.temp_dir, f"temp_{i}_{timestamp}.mp3")
+                await tts_service.generate_audio(chunk, temp_path)
+                temp_files.append(temp_path)
+
+            # Nối các file audio
+            audio_clips = [AudioFileClip(f) for f in temp_files]
+            final_audio = concatenate_audioclips(audio_clips)
+            final_audio.write_audiofile(output_path)
             
-            logger.info(f"Audio generated successfully: {output_path}")
+            # Dọn dẹp
+            for clip in audio_clips:
+                clip.close()
+            for f in temp_files:
+                try:
+                    os.remove(f)
+                except:
+                    pass
+
             return output_path
-            
+
         except Exception as e:
             logger.error(f"Failed to generate audio: {e}")
             raise

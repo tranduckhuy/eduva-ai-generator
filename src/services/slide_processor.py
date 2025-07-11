@@ -26,6 +26,10 @@ class SlideProcessor:
         tts_script = slide.get('tts_script', '')
         temp_dir = os.path.normpath(temp_dir)
 
+        if len(content) > 8:
+            content = content[:8]
+            logger.warning(f"Slide {slide_id} content truncated from {len(slide.get('content', []))} to 8 elements")
+
         # Calculate content duration for display
         content_duration = self.content_formatter.calculate_content_display_duration(tts_script)
         

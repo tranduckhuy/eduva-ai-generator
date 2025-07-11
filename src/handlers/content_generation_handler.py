@@ -46,9 +46,28 @@ class ContentGenerationHandler(BaseTaskHandler):
             lesson_content = await self._generate_lesson_content(
                 message, file_content
             )
+
+
+            # Preview content generation
+            preview_content = ""
+            slides = lesson_content.get("slides", [])
+            if slides and isinstance(slides, list):
+                slide_texts = []
+                for slide in slides:
+                    content = slide.get("content", "")
+                    if isinstance(content, list):
+                        slide_texts.extend([str(item) for item in content if isinstance(item, str)])
+                    elif isinstance(content, str):
+                        slide_texts.append(content)
+                preview_content = " ".join(slide_texts)[:300]
+            if not preview_content:
+                preview_content = str(lesson_content)[:300]
             
             # Step 4: Calculate metrics
-            word_count = self._calculate_word_count(lesson_content)
+            lesson_info = lesson_content.get("lesson_info", {})
+            word_count = lesson_info.get("total_words", 0)
+            
+            logger.info(f"Preview content: {preview_content[:100]}...")  # Log first 100 chars
             
             # Step 5: Upload content to Azure
             content_blob_name = f"jobs/output/content_{job_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
@@ -58,8 +77,12 @@ class ContentGenerationHandler(BaseTaskHandler):
             # Step 6: Notify backend of success
             success_data = {
                 "wordCount": word_count,
-                "contentBlobName": content_blob_name
+                "contentBlobName": content_blob_name,
+                "previewContent": preview_content,
             }
+
+            # log all the success data
+            logger.info(f"Success data: {json.dumps(success_data, indent=2)}")
             
             success = await self.notify_success(
                 job_id, 

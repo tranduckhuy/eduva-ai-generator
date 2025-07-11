@@ -70,7 +70,7 @@ class ModernBlueTemplate(SlideTemplate):
         draw.ellipse([size[0]-200, -100, size[0]+100, 200], fill='#1e40af', outline=None)
         draw.rectangle([0, size[1]-80, size[0], size[1]], fill='#1e3a8a')
         
-        title_font, content_font = self.get_fonts(42, 28)
+        title_font, content_font = self.get_fonts(40, 26)
         
         # Title
         title_lines = self.wrap_text(draw, title, title_font, size[0] - 120)
@@ -123,7 +123,7 @@ class MinimalGreenTemplate(SlideTemplate):
         # Side accent
         draw.rectangle([0, 120, 8, size[1]], fill='#10b981')
         
-        title_font, content_font = self.get_fonts(44, 30)
+        title_font, content_font = self.get_fonts(40, 26)
         
         # Title
         title_lines = self.wrap_text(draw, title, title_font, size[0] - 60)
@@ -174,7 +174,7 @@ class DarkModeTemplate(SlideTemplate):
         draw.ellipse([size[0]-150, size[1]-150, size[0]+50, size[1]+50], fill='#7c3aed')
         draw.rectangle([0, 0, 6, size[1]], fill='#a855f7')
         
-        title_font, content_font = self.get_fonts(46, 29)
+        title_font, content_font = self.get_fonts(40, 26)
         
         # Title with glow effect
         title_lines = self.wrap_text(draw, title, title_font, size[0] - 100)
@@ -223,7 +223,7 @@ class CreativeOrangeTemplate(SlideTemplate):
         draw.ellipse([size[0]-250, -50, size[0]+50, 250], fill='#fbbf24')
         draw.polygon([(0, 0), (200, 0), (150, 150), (0, 100)], fill='#d97706')
         
-        title_font, content_font = self.get_fonts(48, 30)
+        title_font, content_font = self.get_fonts(40, 26)
         
         # Truncate title if too long (limit to 80 characters)
         if len(title) > 80:
@@ -279,7 +279,7 @@ class CleanWhiteTemplate(SlideTemplate):
         # A thin accent line on the left
         draw.rectangle([0, 0, 10, size[1]], fill='#4285F4') # Google Blue-ish
 
-        title_font, content_font = self.get_fonts(48, 30)
+        title_font, content_font = self.get_fonts(40, 26)
         
         # Truncate title if too long (limit to 80 characters)
         if len(title) > 80:
@@ -324,35 +324,9 @@ class CleanWhiteTemplate(SlideTemplate):
 class BlueAccentTemplate(SlideTemplate):
     """Template designed to mimic the provided image with a large blue accent."""
     
-    def __init__(self, font_path_title='arialbd.ttf', font_path_content='arial.ttf'):
-        self.font_path_title = font_path_title
-        self.font_path_content = font_path_content
-
-    def get_fonts(self, title_size, content_size):
-        title_font = ImageFont.truetype(self.font_path_title, title_size)
-        content_font = ImageFont.truetype(self.font_path_content, content_size)
-        return title_font, content_font
-
-    def wrap_text(self, draw, text, font, max_width):
-        words = text.split()
-        lines, line = [], ""
-        for word in words:
-            test_line = f"{line} {word}".strip()
-            if draw.textlength(test_line, font=font) <= max_width:
-                line = test_line
-            else:
-                lines.append(line)
-                line = word
-        if line:
-            lines.append(line)
-        return lines
-
     def create(self, title: str, contents: List[str], output_path: str, size: tuple = (1280, 720)) -> str:
         img = Image.new('RGB', size, color='#0F172A')  # Deep navy background
         draw = ImageDraw.Draw(img)
-
-        # Fonts
-        title_font, content_font = self.get_fonts(48, 30)
 
         # Accent shape (big ellipse on right)
         accent = Image.new("RGBA", size, (0, 0, 0, 0))
@@ -360,46 +334,43 @@ class BlueAccentTemplate(SlideTemplate):
         accent_draw.ellipse([size[0] - 450, -100, size[0] + 250, size[1] // 2 + 200], fill=(99, 102, 241, 90))  # blur-style shape
         img.paste(accent, (0, 0), accent)
 
+        title_font, content_font = self.get_fonts(40, 26)
+
         # Truncate title if too long (limit to 80 characters)
         if len(title) > 80:
             title = title[:77] + "..."
 
-        # Title
-        title_x, title_y = 80, 50  # Start title higher
-        draw.text((title_x, title_y), title, font=title_font, fill='#FFFFFF')
-
-        # Content (Indented bullets)
-        content_start_y = title_y + 80  # Reduced gap
-        base_content_x = title_x + 10
-        bullet_color = '#3B82F6'
-        bullet_radius = 6
-        content_color = '#E2E8F0'
-
-        for item in contents:
-            wrapped = self.wrap_text(draw, item, content_font, size[0] - 2 * title_x - 100)
-            if wrapped:
-                # Reset content_x for each item
-                content_x = base_content_x
-                
-                if not item.startswith('- '):
-                    bullet_y = content_start_y + (content_font.getbbox(wrapped[0])[3] - content_font.getbbox(wrapped[0])[1]) // 2
-                    draw.ellipse([
-                        content_x - 25 - bullet_radius,
-                        bullet_y - bullet_radius,
-                        content_x - 25 + bullet_radius,
-                        bullet_y + bullet_radius
-                    ], fill=bullet_color)
-                    content_x += 15  # Indent for content after bullet
+        # Title - wrap like other templates
+        title_lines = self.wrap_text(draw, title, title_font, size[0] - 160)
+        y = 50  # Start title higher
+        for line in title_lines[:2]:
+            x = 80
+            draw.text((x, y), line, font=title_font, fill='#FFFFFF')
+            y += 55  # Reduced line spacing
+        
+        # Content - follow same pattern as other templates
+        content_y = y + 40  # Reduced gap between title and content
+        margin = 80
+        for i, content_item in enumerate(contents):
+            content_lines = self.wrap_text(draw, content_item, content_font, size[0] - margin*2 - 40)
+            is_child_content = content_item.startswith('- ')
+            for j, line in enumerate(content_lines):
+                if content_y > size[1] - 80:
+                    break
+                x = margin
+                if j == 0 and not is_child_content:
+                    bullet_y_offset = 8
+                    # Using a filled circle as bullet point
+                    draw.ellipse([x-20, content_y + bullet_y_offset, x-10, content_y + bullet_y_offset + 10], fill='#3B82F6')
+                    x += 30
                 else:
-                    content_x += 15  # Indent for sub-items
-
-                for line in wrapped:
-                    draw.text((content_x, content_start_y), line, font=content_font, fill=content_color)
-                    content_start_y += content_font.getbbox(line)[3] - content_font.getbbox(line)[1] + 10
-                content_start_y += 20
+                    x += 30
+                draw.text((x, content_y), line, font=content_font, fill='#E2E8F0')
+                content_y += 38
+            content_y += 12
 
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
-        img.save(output_path, 'PNG', quality=95)
+        img.save(output_path, 'JPEG', quality=95)
         return output_path
 
 class GeometricAccentTemplate(SlideTemplate):
@@ -418,7 +389,7 @@ class GeometricAccentTemplate(SlideTemplate):
         # Thin line at the bottom
         draw.rectangle([0, size[1]-10, size[0], size[1]], fill='#3B82F6') # Blue accent
         
-        title_font, content_font = self.get_fonts(50, 30)
+        title_font, content_font = self.get_fonts(40, 26)
         
         # Truncate title if too long (limit to 80 characters)
         if len(title) > 80:
@@ -482,7 +453,7 @@ class NatureGreenTemplate(SlideTemplate):
         draw.ellipse([size[0]-250, -50, size[0]+50, 150], fill='#10B981', outline=None) # Top right green
         draw.ellipse([-100, size[1]-200, 100, size[1]], fill='#059669', outline=None) # Bottom left darker green
         
-        title_font, content_font = self.get_fonts(48, 30)
+        title_font, content_font = self.get_fonts(40, 26)
         
         # Truncate title if too long (limit to 80 characters)
         if len(title) > 80:
@@ -529,25 +500,6 @@ class ModernQuestionSlideTemplate(SlideTemplate):
         self.font_path_title = font_path_title
         self.font_path_content = font_path_content
 
-    def get_fonts(self, title_size: int, content_size: int):
-        """Get fonts with fallback"""
-        try:
-            if self.font_path_title:
-                title_font = ImageFont.truetype(self.font_path_title, title_size)
-            else:
-                title_font = ImageFont.truetype("arialbd.ttf", title_size)
-        except:
-            title_font = ImageFont.load_default()
-        
-        try:
-            if self.font_path_content:
-                content_font = ImageFont.truetype(self.font_path_content, content_size)
-            else:
-                content_font = ImageFont.truetype("arial.ttf", content_size)
-        except:
-            content_font = ImageFont.load_default()
-        
-        return title_font, content_font
 
     def create(self, title: str, contents: List[str], output_path: str, size: tuple = (1280, 720)) -> str:
         """Create modern question slide with consistent signature"""
@@ -555,7 +507,7 @@ class ModernQuestionSlideTemplate(SlideTemplate):
         draw = ImageDraw.Draw(img)
 
         # Fonts
-        title_font, content_font = self.get_fonts(42, 28)
+        title_font, content_font = self.get_fonts(40, 26)
 
         # Truncate title if too long (limit to 80 characters)
         if len(title) > 80:
