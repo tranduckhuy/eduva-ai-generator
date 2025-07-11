@@ -1,9 +1,7 @@
 services:
   # AI Worker only - connects to external RabbitMQ
   ai-worker:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: ghcr.io/eduva/eduva-ai-generator:latest
     container_name: ai-worker
     environment:
       # RabbitMQ Configuration (external)
@@ -14,7 +12,7 @@ services:
       MAIN_EXCHANGE: ${MAIN_EXCHANGE}
       ROUTING_KEY: ${ROUTING_KEY}
 
-      #
+      # DLQ Configuration
       DLQ_MONITORING_ENABLED: ${DLQ_MONITORING_ENABLED}
       DLQ_ALERT_THRESHOLD: ${DLQ_ALERT_THRESHOLD}
       MAX_RETRIES: ${MAX_RETRIES}
@@ -34,5 +32,11 @@ services:
       GOOGLE_APPLICATION_CREDENTIALS: ${GOOGLE_APPLICATION_CREDENTIALS}
       UNSPLASH_ACCESS_KEY: ${UNSPLASH_ACCESS_KEY}
       PEXELS_ACCESS_KEY: ${PEXELS_ACCESS_KEY}
+
+      # Backward compatibility
+      PINECONE_API_KEY: ${PINECONE_API_KEY}
+      PINECONE_INDEX_NAME: ${PINECONE_INDEX_NAME}
+    volumes:
+      - ./credentials:/app/credentials
 
     restart: unless-stopped
