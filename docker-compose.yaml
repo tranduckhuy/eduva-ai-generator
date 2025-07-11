@@ -1,7 +1,7 @@
 services:
   # AI Worker only - connects to external RabbitMQ
   ai-worker:
-    image: ghcr.io/eduva/eduva-ai-generator:latest
+    image: ghcr.io/tranduckhuy/eduva-ai-generator:latest
     container_name: ai-worker
     environment:
       # RabbitMQ Configuration (external)
@@ -37,6 +37,6 @@ services:
       PINECONE_API_KEY: ${PINECONE_API_KEY}
       PINECONE_INDEX_NAME: ${PINECONE_INDEX_NAME}
     volumes:
-      - ./credentials:/app/credentials
+      - /etc/huytde_work/credentials:/app/credentials:ro
 
     restart: unless-stopped
