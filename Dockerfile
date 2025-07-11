@@ -17,6 +17,9 @@ RUN apt-get update && apt-get install -y \
     libxrender1 \
     libgl1-mesa-glx \
     fonts-liberation \
+    fonts-dejavu-core \
+    fonts-dejavu-extra \
+    fonts-noto \
     && rm -rf /var/lib/apt/lists/*
 
 # Set working directory

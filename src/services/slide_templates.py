@@ -19,14 +19,25 @@ class SlideTemplate:
         """Get fonts with fallback"""
         try:
             if self.is_windows:
-                title_font = ImageFont.truetype("arial.ttf", title_size)
-                content_font = ImageFont.truetype("arial.ttf", content_size)
+                font_path = "arial.ttf"
+            elif os.path.exists("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"):
+                font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
+            elif os.path.exists("/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf"):
+                font_path = "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf"
             else:
-                title_font = ImageFont.truetype("/System/Library/Fonts/Arial.ttf", title_size)
-                content_font = ImageFont.truetype("/System/Library/Fonts/Arial.ttf", content_size)
-        except:
+                font_path = None
+
+            if font_path:
+                title_font = ImageFont.truetype(font_path, title_size)
+                content_font = ImageFont.truetype(font_path, content_size)
+            else:
+                raise Exception("Font not found")
+
+        except Exception as e:
+            logger.warning(f"Font load failed: {e}")
             title_font = ImageFont.load_default()
             content_font = ImageFont.load_default()
+
         return title_font, content_font
     
     def wrap_text(self, draw, text: str, font, max_width: int) -> List[str]:
