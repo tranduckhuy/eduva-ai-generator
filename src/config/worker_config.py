@@ -18,10 +18,11 @@ class WorkerConfig:
     
     # Queue Configuration
     ai_task_queue: str = os.getenv("AI_TASK_QUEUE", "eduva_ai_tasks_queue")
-    dlq_queue: str = os.getenv("DLQ_QUEUE", "ai_task_dlq")
-    dlq_exchange: str = os.getenv("DLQ_EXCHANGE", "eduva_ai_task_dlq")
     main_exchange: str = os.getenv("MAIN_EXCHANGE", "eduva_exchange")
     routing_key: str = os.getenv("ROUTING_KEY", "eduva_routing_key")
+    dlq_queue: str = os.getenv("DLQ_QUEUE", "eduva_ai_tasks_dlq_queue")
+    dlq_exchange: str = os.getenv("DLQ_EXCHANGE", "eduva_ai_task_dlq")
+    dlq_routing_key: str = os.getenv("DLQ_ROUTING_KEY", "eduva_dlq_routing_key")
     
     # Azure Blob Storage Configuration
     azure_storage_connection_string: str = os.getenv("AZURE_STORAGE_CONNECTION_STRING", "")

@@ -35,10 +35,11 @@ jobs:
           echo "Setting up Docker Compose environment..."
           echo "RABBITMQ_URI=${{ secrets.RABBITMQ_URI }}" >> .env
           echo "AI_TASK_QUEUE=${{ secrets.AI_TASK_QUEUE }}" >> .env
-          echo "DLQ_QUEUE=${{ secrets.DLQ_QUEUE }}" >> .env
-          echo "DLQ_EXCHANGE=${{ secrets.DLQ_EXCHANGE }}" >> .env
           echo "MAIN_EXCHANGE=${{ secrets.MAIN_EXCHANGE }}" >> .env
           echo "ROUTING_KEY=${{ secrets.ROUTING_KEY }}" >> .env
+          echo "DLQ_QUEUE=${{ secrets.DLQ_QUEUE }}" >> .env
+          echo "DLQ_EXCHANGE=${{ secrets.DLQ_EXCHANGE }}" >> .env
+          echo "DLQ_ROUTING_KEY=${{ secrets.DLQ_ROUTING_KEY }}" >> .env
           echo "DLQ_MONITORING_ENABLED=${{ secrets.DLQ_MONITORING_ENABLED }}" >> .env
           echo "DLQ_ALERT_THRESHOLD=${{ secrets.DLQ_ALERT_THRESHOLD }}" >> .env
           echo "MAX_RETRIES=${{ secrets.MAX_RETRIES }}" >> .env

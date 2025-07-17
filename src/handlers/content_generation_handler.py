@@ -47,7 +47,6 @@ class ContentGenerationHandler(BaseTaskHandler):
                 message, file_content
             )
 
-
             # Preview content generation
             preview_content = ""
             slides = lesson_content.get("slides", [])

@@ -4,12 +4,10 @@ RabbitMQ connection and message handling
 import asyncio
 import json
 import pika
-import time
 from typing import Callable, Optional, Dict, Any
 from pika.exceptions import AMQPConnectionError
 from src.config.worker_config import WorkerConfig
 from src.utils.logger import logger
-import os
 
 
 class RabbitMQManager:
@@ -151,19 +149,25 @@ class RabbitMQManager:
     def _setup_main_queue(self):
         """Setup main task queue"""
         try:
-            # Try to check if queue exists with passive declare
             logger.info(f"Checking if queue {self.config.ai_task_queue} exists...")
-            self.channel.queue_declare(queue=self.config.ai_task_queue, passive=True)
-            logger.info(f"Queue {self.config.ai_task_queue} already exists, using existing configuration")
-            
-        except Exception:
-            # Queue doesn't exist or has different config, create new one
-            logger.info(f"Creating new queue {self.config.ai_task_queue} with dead letter exchange")
+            self.channel.queue_declare(
+                queue=self.config.ai_task_queue,
+                passive=True
+            )
+            logger.info(f"Queue {self.config.ai_task_queue} already exists")
+        except pika.exceptions.ChannelClosedByBroker as e:
+            logger.warning(f"Queue check failed (passive): {e}")
+            self.channel = self.connection.channel()  # Reopen channel
+            logger.info(f"Creating queue {self.config.ai_task_queue}")
             self.channel.queue_declare(
                 queue=self.config.ai_task_queue,
                 durable=True,
-                arguments={'x-dead-letter-exchange': self.config.dlq_exchange}
+                arguments={
+                    'x-dead-letter-exchange': self.config.dlq_exchange,
+                    'x-dead-letter-routing-key': self.config.dlq_routing_key
+                }
             )
+
     
     def _setup_dead_letter_queue(self):
         """Setup dead letter queue"""
@@ -185,7 +189,7 @@ class RabbitMQManager:
         self.channel.queue_bind(
             exchange=self.config.dlq_exchange,
             queue=self.config.dlq_queue,
-            routing_key=self.config.dlq_queue
+            routing_key=self.config.dlq_routing_key
         )
     
     def _setup_qos(self):
