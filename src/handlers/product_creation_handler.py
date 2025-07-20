@@ -12,7 +12,7 @@ from src.config.job_status import JobStatus
 from src.utils.logger import logger
 from src.services.tts_service import TTSService
 from src.services.tts_service import TTSService
-from moviepy.editor import concatenate_audioclips, AudioFileClip
+from moviepy.editor import concatenate_audioclips, AudioFileClip, VideoFileClip
 
 
 class ProductCreationHandler(BaseTaskHandler):
@@ -30,6 +30,7 @@ class ProductCreationHandler(BaseTaskHandler):
         """
         job_id = message.jobId
         local_product_file = None
+        product_blob_name = None
         
         try:
             logger.info(f"Starting product creation for job {job_id}")
@@ -43,15 +44,30 @@ class ProductCreationHandler(BaseTaskHandler):
             local_product_file = await self._generate_product(
                 message, lesson_content
             )
-            
+
+            duration_seconds = None
+            if message.jobType == JobType.VIDEO_LESSON:
+                # Log video duration
+                duration_seconds = self.get_video_duration(local_product_file)
+            elif message.jobType == JobType.AUDIO_LESSON:
+                # Log audio duration
+                duration_seconds = self.get_audio_duration(local_product_file)
+            logger.info(f"Product duration: {duration_seconds} seconds")
+
             # Step 3: Upload product to Azure
-            product_blob_name = f"ai-product/product_{job_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.{self._get_file_extension(message.jobType)}"
-            logger.info(f"Uploading product to: {product_blob_name}")
-            await self.upload_product_file(local_product_file, product_blob_name)
+            if local_product_file:
+                product_blob_name = f"ai-product/product_{job_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.{self._get_file_extension(message.jobType)}"
+                logger.info(f"Uploading product to: {product_blob_name}")
+                await self.upload_product_file(local_product_file, product_blob_name)
             
+            video_output_blob_name = product_blob_name if message.jobType == JobType.VIDEO_LESSON else None
+            audio_output_blob_name = product_blob_name if message.jobType == JobType.AUDIO_LESSON else None
+
             # Step 4: Notify backend of success
             success_data = {
-                "productBlobName": product_blob_name
+                "videoOutputBlobName": video_output_blob_name,
+                "audioOutputBlobName": audio_output_blob_name,
+                "actualDuration": duration_seconds,
             }
             
             await self.notify_success(
@@ -67,6 +83,10 @@ class ProductCreationHandler(BaseTaskHandler):
             error_message = f"Product creation failed for job {job_id}: {str(e)}"
             logger.error(error_message)
             
+            # Delete blob file on Azure if it was uploaded
+            if product_blob_name:
+                await self.delete_blob(self.config.azure_output_container, product_blob_name)
+
             # Notify backend of failure
             await self.notify_failure(job_id, error_message)
             return False
@@ -243,3 +263,16 @@ class ProductCreationHandler(BaseTaskHandler):
             JobType.AUDIO_LESSON: "mp3",
         }
         return extension_map.get(job_type, "mp4")
+    
+    def get_video_duration(self, filepath: str) -> float:
+        clip = VideoFileClip(filepath)
+        duration = clip.duration
+        clip.reader.close()
+        clip.audio.reader.close_proc() if clip.audio else None
+        return duration
+
+    def get_audio_duration(self, filepath: str) -> float:
+        clip = AudioFileClip(filepath)
+        duration = clip.duration
+        clip.close()
+        return duration

@@ -2,6 +2,7 @@ import os
 from src.utils.logger import logger
 from .func import create_slide_data
 from .prompt import create_messages_for_llm
+from src.config.llm import get_llm
 
 DEFAULT_MODEL = os.getenv("DEFAULT_MODEL")
 
@@ -17,7 +18,6 @@ async def run_slide_creator(topic: str, uploaded_files_content: str = None, mode
         )
 
         # Step 2: Generate slides with LLM
-        from src.config.llm import get_llm
         llm = get_llm(model_name)
         logger.info(f"Generating slides with {model_name}...")
         

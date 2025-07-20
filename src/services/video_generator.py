@@ -7,12 +7,13 @@ from typing import List, Dict, Any
 from concurrent.futures import ThreadPoolExecutor
 from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips, VideoFileClip, concatenate_audioclips
 from moviepy.audio.AudioClip import AudioArrayClip
+from moviepy.audio.fx.audio_fadeout import audio_fadeout
 import numpy as np
 import tempfile
 import logging
 from contextlib import contextmanager
 import shutil
-
+import subprocess
 # Import our new helper modules
 from .content_formatter import ContentFormatter
 from .slide_processor import SlideProcessor
@@ -266,7 +267,8 @@ class VideoGenerator:
                     
                     # Load original audio
                     audio = AudioFileClip(path)
-                    
+                    audio = audio_fadeout(audio, 0.02)
+
                     # Create silence clip in memory - no file needed
                     fps = 44100  # Standard sample rate
                     channels = 2  # Stereo
@@ -390,90 +392,56 @@ class VideoGenerator:
                 raise
 
     async def _combine_videos(self, video_paths: List[str], output_path: str) -> str:
-        """Combine all slide videos into final video with proper cleanup"""
+        """
+        Combine all slide videos using FFmpeg CLI for memory efficiency.
+        """
         try:
             if not video_paths:
                 raise ValueError("No video files to combine")
-              # Validate video files exist and normalize paths
-            valid_paths = []
-            for path in video_paths:
-                if path and os.path.exists(path):
-                    valid_paths.append(os.path.abspath(path))
-                else:
-                    logger.warning(f"Video file not found: {path}")
-            
-            if not valid_paths:
-                raise ValueError("No valid video clips found")
-            
-            # Validate and normalize output path
+
             output_path = os.path.abspath(output_path)
             os.makedirs(os.path.dirname(output_path), exist_ok=True)
             
-            with self._safe_moviepy_context() as clips:
-                # Load video clips one by one to avoid memory buildup
-                video_clips = []
-                for i, path in enumerate(valid_paths):
-                    try:
-                        logger.info(f"Loading video clip {i+1}/{len(valid_paths)}: {os.path.basename(path)}")
-                        clip = VideoFileClip(path)
-                        video_clips.append(clip)
-                        clips.append(clip)
-                        
-                        # Force cleanup every few clips
-                        if (i + 1) % 2 == 0:
-                            gc.collect()
-                            
-                    except Exception as e:
-                        logger.warning(f"Could not load video clip {path}: {e}")
-                        continue
-                
-                if not video_clips:
-                    raise ValueError("No clips loaded successfully")
-                
-                logger.info(f"Concatenating {len(video_clips)} video clips...")
-                # Concatenate all clips - use simple method
-                final_video = concatenate_videoclips(video_clips)
-                clips.append(final_video)
-                
-                # DO NOT clear intermediate clips yet - keep them for final video
-                
-                # Create temporary output path to avoid conflicts with proper path handling
-                temp_filename = f"{os.path.splitext(os.path.basename(output_path))[0]}_temp.mp4"
-                temp_output = os.path.join(os.path.dirname(output_path), temp_filename)
-                
-                # Write final video with safe operation - OPTIMIZED
-                self._safe_file_operation(
-                    final_video.write_videofile,
-                    temp_output,
-                    fps=self.video_fps,  # OPTIMIZED: Lower FPS
-                    codec='libx264',
-                    audio_codec='aac',
-                    verbose=False,
-                    logger=None,
-                    preset='ultrafast',  # OPTIMIZED: Fastest encoding
-                    threads=self.max_workers_optimized,  # OPTIMIZED: Use more threads
-                    ffmpeg_params=['-crf', '28']  # OPTIMIZED: Higher compression for speed
-                )
-                
-                # Force cleanup before moving file
-                clips.clear()
-                gc.collect()
-                time.sleep(self.cleanup_delay)
-                
-                # Move temp file to final location
-                self._safe_file_operation(shutil.move, temp_output, output_path)
-                
-                logger.info(f"Final video saved: {output_path}")
-                return output_path
-                
+            temp_dir = os.path.dirname(video_paths[0])
+            list_file_path = os.path.join(temp_dir, "filelist.txt")
+
+            with open(list_file_path, 'w') as f:
+                for path in video_paths:
+                    f.write(f"file '{os.path.abspath(path)}'\n")
+
+            logger.info(f"Using FFmpeg to concatenate {len(video_paths)} videos...")
+
+            cmd = [
+                'ffmpeg',
+                '-y',
+                '-f', 'concat',
+                '-safe', '0',
+                '-i', list_file_path,
+                '-c', 'copy',
+                output_path
+            ]
+            
+            # Chạy lệnh
+            process = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE
+            )
+            stdout, stderr = await process.communicate()
+
+            if process.returncode != 0:
+                logger.error(f"FFmpeg failed with code {process.returncode}")
+                logger.error(f"FFmpeg stderr: {stderr.decode()}")
+                raise RuntimeError("FFmpeg concatenation failed")
+
+            logger.info(f"Final video saved successfully: {output_path}")
+            
+            # Dọn dẹp file list.txt
+            os.remove(list_file_path)
+
+            return output_path
+
         except Exception as e:
-            logger.error(f"Error combining videos: {e}")            # Clean up temp file if it exists
-            try:
-                temp_filename = f"{os.path.splitext(os.path.basename(output_path))[0]}_temp.mp4"
-                temp_output = os.path.join(os.path.dirname(output_path), temp_filename)
-                if os.path.exists(temp_output):
-                    os.remove(temp_output)
-            except Exception as cleanup_error:
-                logger.warning(f"Could not clean up temp file: {cleanup_error}")
+            logger.error(f"Error combining videos: {e}")
             raise
 

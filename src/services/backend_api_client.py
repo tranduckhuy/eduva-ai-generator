@@ -137,7 +137,9 @@ class BackendApiClient:
             "wordCount": kwargs.get("wordCount"),
             "previewContent": kwargs.get("previewContent"),
             "contentBlobName": kwargs.get("contentBlobName"),
-            "productBlobName": kwargs.get("productBlobName")
+            "videoOutputBlobName": kwargs.get("videoOutputBlobName"),
+            "audioOutputBlobName": kwargs.get("audioOutputBlobName"),
+            "actualDuration": kwargs.get("actualDuration"),
         }
         
         # Remove None values

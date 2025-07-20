@@ -246,6 +246,23 @@ class BaseTaskHandler(ABC):
         except Exception as e:
             logger.error(f"Failed to download JSON content {blob_name}: {e}")
             raise
+
+    async def delete_blob(self, container_name: str, blob_name: str) -> bool:
+        """
+        Delete a blob from Azure Blob Storage
+        
+        Args:
+            blob_name: Name of the blob to delete
+            
+        Returns:
+            bool: True if deletion was successful, False otherwise
+        """
+        try:
+            return await self.azure_service.delete_blob(container_name, blob_name)
+        except Exception as e:
+            logger.error(f"Failed to delete blob {blob_name}: {e}")
+            return False
+
     
     async def notify_success(self, job_id: str, status: JobStatus, **kwargs) -> bool:
         """

@@ -21,6 +21,7 @@ pydantic[email]
 python_jose==3.3.0
 python-docx
 docx2txt
+unstructured
 PyJWT==2.8.0
 moviepy==1.0.3
 google-cloud-texttospeech

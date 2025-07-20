@@ -29,6 +29,7 @@ class ContentGenerationHandler(BaseTaskHandler):
         """
         job_id = message.jobId
         local_source_files = []
+        content_blob_name = None
         
         try:
             logger.info(f"Starting content generation for job {job_id}")
@@ -66,8 +67,6 @@ class ContentGenerationHandler(BaseTaskHandler):
             lesson_info = lesson_content.get("lesson_info", {})
             word_count = lesson_info.get("total_words", 0)
             
-            logger.info(f"Preview content: {preview_content[:100]}...")  # Log first 100 chars
-            
             # Step 5: Upload content to Azure
             content_blob_name = f"jobs/output/content_{job_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
             logger.info(f"Uploading content to: {content_blob_name}")
@@ -80,9 +79,6 @@ class ContentGenerationHandler(BaseTaskHandler):
                 "previewContent": preview_content,
             }
 
-            # log all the success data
-            logger.info(f"Success data: {json.dumps(success_data, indent=2)}")
-            
             success = await self.notify_success(
                 job_id, 
                 JobStatus.ContentGenerated,  # Use enum directly
@@ -98,7 +94,13 @@ class ContentGenerationHandler(BaseTaskHandler):
         except Exception as e:
             error_message = f"Content generation failed for job {job_id}: {str(e)}"
             logger.error(error_message)
-            
+
+            # Delete blob file on Azure if it was uploaded
+
+            if content_blob_name:
+                success = await self.delete_blob(self.config.azure_input_container, content_blob_name)
+                logger.error(f"Deleted blob file: {content_blob_name} due to error - Delete status: {success}")
+
             # Notify backend of failure
             await self.notify_failure(job_id, error_message)
             return False

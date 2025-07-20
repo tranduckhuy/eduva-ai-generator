@@ -518,7 +518,7 @@ class ModernQuestionSlideTemplate(SlideTemplate):
         draw = ImageDraw.Draw(img)
 
         # Fonts
-        title_font, content_font = self.get_fonts(40, 26)
+        title_font, content_font = self.get_fonts(30, 26)
 
         # Truncate title if too long (limit to 80 characters)
         if len(title) > 80:
@@ -540,15 +540,15 @@ class ModernQuestionSlideTemplate(SlideTemplate):
             if title_x + title_w > size[0] - 140:  # If still too wide, adjust
                 title_x = 190
             draw.text((title_x, current_y), line, font=title_font, fill='#000000')
-            current_y += 50  # Line spacing for title
+            current_y += 35  # Line spacing for title
         
         # Adjust underline position based on number of title lines - also with safe margins
-        underline_y = title_start_y + (len(title_lines[:2]) * 50) + 15
+        underline_y = title_start_y + (len(title_lines[:2]) * 30) + 15
         draw.line([(190, underline_y), (size[0] - 140, underline_y)], fill='#000000', width=3)
 
         # Left circle accents
-        draw.ellipse([50, 30, 180, 160], fill='#3B82F6')  # Blue circle
-        draw.ellipse([70, 200, 120, 250], fill='#E57362')  # Red circle
+        draw.ellipse([40, 10, 170, 140], fill='#3B82F6')  # Blue circle
+        draw.ellipse([60, 180, 110, 230], fill='#E57362')  # Red circle
 
         # Top-right "browser dots"
         draw.ellipse([size[0] - 120, 40, size[0] - 100, 60], fill='#FACC15')  # Yellow
@@ -557,8 +557,8 @@ class ModernQuestionSlideTemplate(SlideTemplate):
 
         # Content rendering - adjust start position based on title height
         x_text = 200
-        y_text = max(160, underline_y + 40)  # Start content below title with proper spacing
-        line_spacing = 12
+        y_text = max(100, underline_y + 30)  # Start content below title with proper spacing
+        line_spacing = 8
 
         for item in contents:
             # Parse content - handle both "label: description" and plain text
@@ -576,20 +576,18 @@ class ModernQuestionSlideTemplate(SlideTemplate):
             if lines:
                 # Bullet point
                 if not full_text.startswith('- '):
-                    # Draw bullet point as a filled circle
                     bullet_y = y_text + 8
                     draw.ellipse([x_text - 25, bullet_y, x_text - 10, bullet_y + 15], fill='#000000')
-                
-                x_text += 20
-                draw.text((x_text, y_text), lines[0], font=content_font, fill='#000000')
+
+                indent_x = x_text + 20
+                draw.text((indent_x, y_text), lines[0], font=content_font, fill='#000000')
                 y_text += content_font.getbbox(lines[0])[3] - content_font.getbbox(lines[0])[1] + line_spacing
 
-                # Draw remaining lines
                 for line in lines[1:]:
-                    draw.text((x_text, y_text), line, font=content_font, fill='#000000')
+                    draw.text((indent_x, y_text), line, font=content_font, fill='#000000')
                     y_text += content_font.getbbox(line)[3] - content_font.getbbox(line)[1] + line_spacing
 
-            y_text += 20  # Spacing between items
+            y_text += 10  # Spacing between items
 
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
         img.save(output_path, 'PNG', quality=95)

@@ -5,6 +5,8 @@ from typing import Sequence, Annotated
 from langchain_core.documents import Document
 from .tools import retrieve_document
 from src.utils.logger import logger
+import json
+import re
 
 tools = [retrieve_document]
 
@@ -59,17 +61,16 @@ def execute_tool(state: State):
 def create_slide_data(ai_response: str) -> dict:
     """Create structured slide data from AI response"""
     try:
-        import json
-        import re
-        
         # Extract JSON from response
         json_pattern = r'\{[\s\S]*\}'
         json_match = re.search(json_pattern, ai_response)
         
         if json_match:
+            logger.info("Parsing JSON from AI response")
             slide_data = json.loads(json_match.group())
             return slide_data
         else:
+            logger.warning("Creating basic slides due to JSON parsing failure")
             return create_basic_slides(ai_response)
             
     except Exception as e:

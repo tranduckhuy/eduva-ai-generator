@@ -30,8 +30,6 @@ def get_llm(model_name: str, api_key: str = None) -> ChatGoogleGenerativeAI:
         ValueError: If model name is not supported
     """
     # log model name
-    logger.info(f"Getting LLM for model: {model_name}")
-
     if api_key:
         logger.warning("Using custom API key")
         return ChatGoogleGenerativeAI(
