@@ -13,6 +13,9 @@ from src.services.tts_service import estimate_speech_duration
 
 logging.basicConfig(level=logging.INFO)
 
+from dotenv import load_dotenv
+load_dotenv()
+
 def get_memory_usage():
     """Get current memory usage in MB"""
     process = psutil.Process(os.getpid())
@@ -22,6 +25,7 @@ async def test_optimized_performance():
     """Test with the OPTIMIZED VideoGenerator using realistic data"""
     
     # Real-world lesson data with longer TTS scripts
+
     lesson_data = {
         "slides": [
             {
@@ -97,9 +101,14 @@ async def test_optimized_performance():
     total_estimated_duration = sum(estimate_speech_duration(slide['tts_script']) for slide in lesson_data['slides'])
     
     video_generator = VideoGenerator()
-    video_generator.slide_processor.image_generator.set_template("blue_accent")  # Use the optimized beautiful template
+    video_generator.slide_processor.image_generator.set_template("soft_modern_edu")  # Use the optimized beautiful template
 
-    output_path = f"optimized_test_{datetime.now().strftime('%Y%m%d_%H%M%S')}.mp4"
+
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    output_dir = os.path.join(base_dir, "temp_videos")
+    os.makedirs(output_dir, exist_ok=True)
+    
+    output_path = os.path.join(output_dir, f"optimized_test_{datetime.now().strftime('%Y%m%d_%H%M%S')}.mp4")
     
     # Detailed timing tracking
     memory_tracking = []
@@ -132,7 +141,7 @@ async def test_optimized_performance():
         print(f"   - Starting template: {video_generator.slide_processor.image_generator.template_manager.current_template}")
         print()
         # Use the optimized original VideoGenerator
-        result = await video_generator.generate_lesson_video(lesson_data, output_path)
+        result = await video_generator.generate_lesson_video(lesson_data, output_path, base_dir)
         
         total_time = time.time() - overall_start
         track_memory()

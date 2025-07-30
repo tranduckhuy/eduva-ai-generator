@@ -8,8 +8,13 @@ from typing import List, Dict, Any, Optional
 from PIL import Image, ImageDraw, ImageFont
 import logging
 from .slide_templates import SlideTemplateManager
+import vertexai
+from vertexai.preview.vision_models import ImageGenerationModel
 
 logger = logging.getLogger(__name__)
+PROJECT_ID = os.getenv("GOOGLE_CLOUD_PROJECT")
+LOCATION = os.getenv("GOOGLE_CLOUD_LOCATION", "us-central1")
+IMAGE_GENERATION_MODEL = os.getenv("IMAGE_GENERATION_MODEL", "imagen-4.0-fast-generate-preview-06-06")
 
 class ImageGenerator:
     def __init__(self, unsplash_access_key: str = None, template_name: str = 'modern_blue'):
@@ -19,6 +24,14 @@ class ImageGenerator:
         # Initialize template manager
         self.template_manager = SlideTemplateManager()
         self.template_manager.set_template(template_name)
+
+        try:
+            vertexai.init(project=PROJECT_ID, location=LOCATION)
+            self.generation_model = ImageGenerationModel.from_pretrained(IMAGE_GENERATION_MODEL)
+            logger.info("✅ Vertex AI initialized successfully.")
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to initialize Vertex AI: {e}")
+            self.generation_model = None
         
     def set_template(self, template_name: str):
         """Set slide template"""
@@ -99,6 +112,31 @@ class ImageGenerator:
             except:
                 return image_path
     
+    def generate_ai_image(self, prompt: str, output_path: str, aspect_ratio: str = "16:9") -> str:
+        """Generates an image using Vertex AI and saves it."""
+        if not self.generation_model:
+            logger.warning("Vertex AI model is not available. Skipping AI image generation.")
+            return None
+        
+        try:
+            logger.info(f"🤖 Generating AI image with prompt: '{prompt}'")
+            images = self.generation_model.generate_images(
+                prompt=prompt,
+                number_of_images=1,
+                aspect_ratio=aspect_ratio,
+                negative_prompt="text, watermark, blurry, low quality"
+            )
+            
+            images.images[0].save(location=output_path)
+            
+            if os.path.exists(output_path):
+                logger.info(f"🖼️ AI image saved successfully to {output_path}")
+                return output_path
+            return None
+        except Exception as e:
+            logger.error(f"❌ AI image generation failed for prompt '{prompt}': {e}")
+            return None
+
     def get_single_unsplash_image_fast(self, keyword: str) -> str:
         """Get a single image from Unsplash quickly - optimized for speed"""
         if not self.unsplash_access_key or not keyword:

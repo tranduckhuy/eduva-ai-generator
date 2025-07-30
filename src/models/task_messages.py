@@ -5,7 +5,6 @@ from dataclasses import dataclass
 from typing import Dict, Any, Optional, List
 from enum import Enum
 
-
 class TaskType(str, Enum):
     """Types of tasks that can be processed"""
     GENERATE_CONTENT = "generate_content"
@@ -147,8 +146,8 @@ EXAMPLE_CREATE_PRODUCT_MESSAGE = {
     "jobType": 1,  # 0 for audio, 1 for video (matches C# AIServiceType enum)
     "contentBlobName": "lesson_content.json",
     "voiceConfig": {
-        "language_code": "vi-VN",
+        "languageCode": "vi-VN",
         "name": "vi-VN-Neural2-A",
-        "speaking_rate": 1.0
+        "speakingRate": 1.0
     }
 }

@@ -32,3 +32,4 @@ asyncio
 pika
 azure-storage-blob
 azure-identity
+google-cloud-aiplatform

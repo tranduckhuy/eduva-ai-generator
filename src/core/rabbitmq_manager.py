@@ -194,7 +194,7 @@ class RabbitMQManager:
     
     def _setup_qos(self):
         """Setup quality of service"""
-        self.channel.basic_qos(prefetch_count=1)
+        self.channel.basic_qos(prefetch_count=self.config.prefetch_count)
     
     # =============================================================================
     # MESSAGE CONSUMPTION

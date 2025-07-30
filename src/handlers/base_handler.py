@@ -17,14 +17,20 @@ from src.config.job_status import JobStatus
 class BaseTaskHandler(ABC):
     """Base class for task handlers"""
     
-    def __init__(self, config: WorkerConfig):
-        """Initialize base task handler"""
+    # def __init__(self, config: WorkerConfig):
+    #     """Initialize base task handler"""
+    #     self.config = config
+    #     self.azure_service = AzureBlobService(config.azure_storage_connection_string)
+    #     self.backend_client = BackendApiClient(
+    #         config.backend_api_base_url, 
+    #         config.backend_api_key
+    #     )
+
+    def __init__(self, config: WorkerConfig, backend_client: BackendApiClient):
+        """Initialize base task handler with shared clients."""
         self.config = config
+        self.backend_client = backend_client
         self.azure_service = AzureBlobService(config.azure_storage_connection_string)
-        self.backend_client = BackendApiClient(
-            config.backend_api_base_url, 
-            config.backend_api_key
-        )
     
     @abstractmethod
     async def process(self, message: TaskMessage) -> bool:
@@ -277,10 +283,13 @@ class BaseTaskHandler(ABC):
             bool: True if notification was successful
         """
         try:
-            async with self.backend_client:
-                success = await self.backend_client.update_job_success(
-                    job_id, status, **kwargs
-                )
+            # async with self.backend_client:
+            #     success = await self.backend_client.update_job_success(
+            #         job_id, status, **kwargs
+            #     )
+            success = await self.backend_client.update_job_success(
+                job_id, status, **kwargs
+            )
             
             if success:
                 logger.info(f"Successfully notified backend of job {job_id} success")
@@ -305,10 +314,13 @@ class BaseTaskHandler(ABC):
             bool: True if notification was successful
         """
         try:
-            async with self.backend_client:
-                success = await self.backend_client.update_job_failure(
+            # async with self.backend_client:
+            #     success = await self.backend_client.update_job_failure(
+            #         job_id, failure_reason
+            #     )
+            success = await self.backend_client.update_job_failure(
                     job_id, failure_reason
-                )
+            )
             
             if success:
                 logger.info(f"Successfully notified backend of job {job_id} failure")

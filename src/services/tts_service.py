@@ -10,7 +10,7 @@ import logging
 from typing import Dict, Any, Optional, List
 from google.cloud import texttospeech
 from moviepy.editor import AudioClip
-import numpy as np
+import asyncio
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +36,7 @@ class TTSService:
     
     def _setup_voice_config(self, voice_config: Dict[str, Any]):
         """Setup voice and audio configuration"""
-        language_code = voice_config.get('language_code', 'vi-VN')
+        language_code = voice_config.get('languageCode', 'vi-VN')
         voice_name = voice_config.get('name')
         
         if voice_name:
@@ -55,7 +55,7 @@ class TTSService:
         # Audio configuration - optimized for performance
         self.audio_config = texttospeech.AudioConfig(
             audio_encoding=texttospeech.AudioEncoding.MP3,
-            speaking_rate=voice_config.get('speaking_rate', 1.1),
+            speaking_rate=voice_config.get('speakingRate', 1.1),
             sample_rate_hertz=22050  # Lower sample rate for faster processing
         )
     
@@ -109,12 +109,6 @@ class TTSService:
             
         except Exception as e:
             logger.error(f"TTS synthesis failed for text '{text[:50]}...': {e}")
-            # Clean up failed file
-            if os.path.exists(output_path):
-                try:
-                    os.remove(output_path)
-                except:
-                    pass
             raise
     
     async def generate_audio(self, text: str, output_path: str) -> str:
@@ -128,8 +122,6 @@ class TTSService:
         Returns:
             str: Path to the generated audio file
         """
-        import asyncio
-        
         # Run the synchronous method in a thread pool
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(None, self.synthesize_text, text, output_path)
@@ -144,7 +136,8 @@ class TTSService:
             output_path = os.path.normpath(os.path.abspath(output_path))
             
             # Create silent audio using MoviePy
-            silent_clip = AudioClip(lambda t: 0, duration=duration)
+            fps = 44100
+            silent_clip = AudioClip(lambda t: 0, duration=duration, fps=fps)
             silent_clip.write_audiofile(output_path, verbose=False, logger=None)
             silent_clip.close()
             
@@ -189,8 +182,8 @@ class TTSService:
             'average_duration_per_call': avg_duration_per_call,
             'characters_per_second': chars_per_second,
             'voice_config': {
-                'language_code': self.voice.language_code,
-                'speaking_rate': self.audio_config.speaking_rate,
+                'languageCode': self.voice.language_code,
+                'speakingRate': self.audio_config.speaking_rate,
                 'sample_rate': self.audio_config.sample_rate_hertz
             }
         }
@@ -230,6 +223,6 @@ class TTSService:
 # Convenience function for quick usage
 def estimate_speech_duration(text: str, speaking_rate: float = 1.1) -> float:
     """Quick function to estimate speech duration"""
-    voice_config = {'speaking_rate': speaking_rate}
+    voice_config = {'speakingRate': speaking_rate}
     tts = TTSService(voice_config)
     return tts.estimate_audio_duration(text)

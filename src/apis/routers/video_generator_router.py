@@ -19,15 +19,15 @@ class VideoFromSlideDataRequest(BaseModel):
     voice_config: Optional[Dict[str, Any]] = None
 
 class VoiceConfig(BaseModel):
-    language_code: str = "vi-VN"
+    languageCode: str = "vi-VN"
     name: Optional[str] = None  # Specific voice name like "vi-VN-Neural2-A"
-    speaking_rate: float = 1.0  # 0.25 to 4.0
+    speakingRate: float = 1.0  # 0.25 to 4.0
 
 @router.get("/voices")
-async def get_available_voices(language_code: Optional[str] = None):
+async def get_available_voices(languageCode: Optional[str] = None):
     """Get available voices from Google Cloud TTS"""
     try:
-        voices = TTSService.get_available_voices(language_code)
+        voices = TTSService.get_available_voices(languageCode)
         return JSONResponse(content={
             "success": True,
             "voices": voices,
@@ -49,7 +49,7 @@ async def get_vietnamese_voices():
         # Filter and organize Vietnamese voices
         vietnamese_voices = []
         for voice in voices:
-            if voice["language_code"].startswith("vi"):
+            if voice["languageCode"].startswith("vi"):
                 vietnamese_voices.append(voice)
         
         return JSONResponse(content={
@@ -77,7 +77,7 @@ async def generate_video_from_topic(
     topic: str = Form(..., description="Chủ đề cần tạo video"),
     files: List[UploadFile] = File(None, description="Tài liệu tham khảo"),
     voice_name: Optional[str] = Form(None, description="Tên voice cụ thể (vd: vi-VN-Neural2-A)"),
-    speaking_rate: float = Form(1.0, description="Tốc độ nói (0.25-4.0)")
+    speakingRate: float = Form(1.0, description="Tốc độ nói (0.25-4.0)")
 ):
     """API tạo video từ topic với tính toán thời lượng tự động"""
     try:
@@ -139,9 +139,9 @@ async def generate_video_from_topic(
         
         # Prepare voice configuration
         voice_config = {
-            "language_code": "vi-VN",  # Fixed to Vietnamese
+            "languageCode": "vi-VN",
             "name": voice_name,
-            "speaking_rate": speaking_rate
+            "speakingRate": speakingRate
         }
         
         video_generator = VideoGenerator(voice_config=voice_config)
@@ -179,7 +179,7 @@ async def generate_video_from_topic(
         output_path = os.path.join(output_dir, video_filename)
         
         # Tạo video và lưu tại output_path
-        await video_generator.generate_lesson_video(lesson_data, output_path)
+        await video_generator.generate_lesson_video(lesson_data, output_path, base_dir)
         
         logger.info(f"Video generated successfully: {output_path}")
 

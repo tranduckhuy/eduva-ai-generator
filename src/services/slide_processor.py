@@ -2,6 +2,7 @@
 Slide processing utilities for video generation
 """
 import os
+import uuid
 from typing import List, Dict, Any
 import logging
 from .image_generator import ImageGenerator
@@ -57,12 +58,30 @@ class SlideProcessor:
         except Exception as e:
             logger.warning(f"Content image creation failed for slide {slide_id}: {e}")
         
+        generated_image_path = None
+        if keywords:
+            ai_prompt = keywords[0] 
+            
+            image_path = os.path.join(temp_dir, f"ai_{slide_id}_{uuid.uuid4().hex[:8]}.png")
+            generated_image_path = self.image_generator.generate_ai_image(
+                prompt=ai_prompt,
+                output_path=image_path,
+                aspect_ratio="16:9"
+            )
+
+            if generated_image_path:
+                result['images'].append({
+                    'path': generated_image_path,
+                    'type': 'ai_generated',
+                    'duration': 3.0
+                })
+
         # 2. Get up to 1 Unsplash image (optimized)
-        if keywords and len(result['images']) < 2:
+        if not generated_image_path and keywords and len(result['images']) < 2:
             try:
-                image_url = self.image_generator.get_single_unsplash_image_fast(keywords[0])
+                image_url = self.image_generator.get_single_unsplash_image_fast(keywords[1])
                 if image_url:
-                    image_path = os.path.join(temp_dir, f"unsplash_{slide_id}.jpg")
+                    image_path = os.path.join(temp_dir, f"unsplash_{slide_id}_{uuid.uuid4().hex[:8]}.jpg")
                     downloaded_path = self.image_generator.download_single_image_fast(image_url, image_path, image_resolution)
                     if downloaded_path and os.path.exists(downloaded_path):
                         result['images'].append({

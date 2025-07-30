@@ -7,6 +7,7 @@ import sys
 import signal
 from typing import Dict, Any
 from dotenv import load_dotenv
+import ssl
 
 # Load environment variables
 load_dotenv()
@@ -18,18 +19,19 @@ from config.worker_config import WorkerConfig
 from core.task_dispatcher import TaskDispatcher
 from core.rabbitmq_manager import RabbitMQManager
 from utils.logger import logger
-
+import aiohttp
 
 class AIWorker:
     """Main AI Worker class"""
     
-    def __init__(self, config: WorkerConfig):
+    def __init__(self, config: WorkerConfig, session: aiohttp.ClientSession):
         """Initialize AI Worker"""
         self.config = config
-        self.task_dispatcher = TaskDispatcher(config)
+        self.task_dispatcher = TaskDispatcher(config, session)
         self.rabbitmq_manager = RabbitMQManager(config, self._handle_message)
         self.is_running = False
         self.shutdown_event = asyncio.Event()
+        self.semaphore = asyncio.Semaphore(config.max_concurrent_tasks or 5)
         
         logger.info(f"AI Worker {config.worker_id} initialized")
     
@@ -93,14 +95,34 @@ class AIWorker:
         await self.rabbitmq_manager.stop()
         logger.info("AI Worker stopped")
     
+    # async def _handle_message(self, message: Dict[str, Any]) -> bool:
+    #     async def sem_task():
+    #         async with self.semaphore:
+    #             try:
+    #                 logger.info(f"Processing: {message.get('jobId', 'unknown')}")
+    #                 await self.task_dispatcher.dispatch_task(message)
+    #             except Exception as e:
+    #                 logger.error(f"Error processing message: {e}")
+
+    #     try:
+    #         asyncio.create_task(sem_task())
+    #         return True
+    #     except Exception as e:
+    #         logger.error(f"Error dispatching task: {e}")
+    #         return False
+
     async def _handle_message(self, message: Dict[str, Any]) -> bool:
         """Handle incoming message from RabbitMQ"""
+        job_id = message.get("jobId", "unknown")
         try:
-            logger.info(f"Processing message: {message.get('jobId', 'unknown')}")
-            return await self.task_dispatcher.dispatch_task(message)
+            async with self.semaphore:
+                logger.info(f"Processing message: {job_id}")
+                success = await self.task_dispatcher.dispatch_task(message)
+                return success
         except Exception as e:
-            logger.error(f"Error handling message: {e}")
+            logger.error(f"An unhandled exception occurred while processing job {job_id}: {e}", exc_info=True)
             return False
+
     
     def _setup_signal_handlers(self):
         """Setup signal handlers for graceful shutdown"""
@@ -130,19 +152,46 @@ class AIWorker:
         os._exit(0)
 
 
+# async def main():
+#     """Run the AI worker"""
+#     try:
+#         worker = AIWorker(config)
+#         await worker.start()
+#     except KeyboardInterrupt:
+#         logger.info("Stopping worker...")
+#     except Exception as e:
+#         logger.error(f"Error: {e}")
+#         import traceback
+#         traceback.print_exc()
+
+
+# if __name__ == "__main__":
+#     asyncio.run(main())
+
 async def main():
     """Run the AI worker"""
-    try:
-        config = WorkerConfig()
-        worker = AIWorker(config)
-        await worker.start()
-    except KeyboardInterrupt:
-        logger.info("Stopping worker...")
-    except Exception as e:
-        logger.error(f"Error: {e}")
-        import traceback
-        traceback.print_exc()
+    config = WorkerConfig()
+    
+    verify_ssl = not ('localhost' in config.backend_api_base_url.lower() or '127.0.0.1' in config.backend_api_base_url)
+    ssl_context = None
+    if not verify_ssl:
+        ssl_context = ssl.create_default_context()
+        ssl_context.check_hostname = False
+        ssl_context.verify_mode = ssl.CERT_NONE
+        logger.warning("SSL certificate verification is DISABLED.")
+    
+    connector = aiohttp.TCPConnector(ssl=ssl_context)
 
+    async with aiohttp.ClientSession(connector=connector) as session:
+        try:
+            worker = AIWorker(config, session)
+            await worker.start()
+        except KeyboardInterrupt:
+            logger.info("Stopping worker...")
+        except Exception as e:
+            logger.error(f"Error: {e}")
+            import traceback
+            traceback.print_exc()
 
 if __name__ == "__main__":
     asyncio.run(main())
