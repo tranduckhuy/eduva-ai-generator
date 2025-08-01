@@ -8,21 +8,15 @@ from src.handlers.content_generation_handler import ContentGenerationHandler
 from src.handlers.product_creation_handler import ProductCreationHandler
 from src.config.worker_config import WorkerConfig
 from src.utils.logger import logger
+import aiohttp
+from src.services.backend_api_client import BackendApiClient
 
 
 class TaskDispatcher:
     """Dispatcher for routing tasks to appropriate handlers"""
     
-    def __init__(self, config: WorkerConfig):
-        """Initialize task dispatcher"""
-        self.config = config
-        
-        # Initialize handlers
-        self.handlers: Dict[TaskType, BaseTaskHandler] = {
-            TaskType.GENERATE_CONTENT: ContentGenerationHandler(config),
-            TaskType.CREATE_PRODUCT: ProductCreationHandler(config)
-        }
-        
+    def __init__(self, handlers: Dict[TaskType, BaseTaskHandler]):
+        self.handlers = handlers
         logger.info(f"Task dispatcher initialized with {len(self.handlers)} handlers")
     
     async def dispatch_task(self, message_body: Dict) -> bool:

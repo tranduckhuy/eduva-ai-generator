@@ -5,8 +5,6 @@ from typing import Sequence, Annotated
 from langchain_core.documents import Document
 from .tools import retrieve_document
 from src.utils.logger import logger
-import json
-import re
 
 tools = [retrieve_document]
 
@@ -56,63 +54,4 @@ def execute_tool(state: State):
     return {
         "selected_documents": selected_documents,
         "messages": tool_messages,
-    }
-
-def create_slide_data(ai_response: str) -> dict:
-    """Create structured slide data from AI response"""
-    try:
-        # Extract JSON from response
-        json_pattern = r'\{[\s\S]*\}'
-        json_match = re.search(json_pattern, ai_response)
-        
-        if json_match:
-            logger.info("Parsing JSON from AI response")
-            slide_data = json.loads(json_match.group())
-            return slide_data
-        else:
-            logger.warning("Creating basic slides due to JSON parsing failure")
-            return create_basic_slides(ai_response)
-            
-    except Exception as e:
-        logger.error(f"Error creating slide data: {e}")
-        return create_basic_slides(ai_response)
-
-
-def create_basic_slides(content: str) -> dict:
-    """Create basic slide structure when JSON parsing fails"""
-    lines = [line.strip() for line in content.split('\n') if line.strip()]
-    
-    slides = []
-    slide_id = 1
-    
-    # Title slide
-    title = lines[0] if lines else "Bài học mới"
-    slides.append({
-        "slide_id": slide_id,
-        "title": title,
-        "content": [title],
-        "tts_script": f"Chào mừng các em đến với bài học về {title}",
-        "image_keywords": ["education", "learning", "classroom", "students"],
-    })
-    slide_id += 1
-    
-    # Content slides
-    content_lines = lines[1:] if len(lines) > 1 else [content]
-    for i, line in enumerate(content_lines[:5]):
-        slides.append({
-            "slide_id": slide_id,
-            "title": f"Nội dung {i + 1}",
-            "content": [line],
-            "tts_script": f"Chúng ta tìm hiểu về {line}. Đây là kiến thức quan trọng các em cần nắm vững.",
-            "image_keywords": ["education", "textbook", "learning", "diagram"],
-        })
-        slide_id += 1
-    
-    return {
-        "lesson_info": {
-            "title": title,
-            "slide_count": len(slides),
-            "target_level": "Cấp 3 (lớp 10-12)",
-        },
-        "slides": slides
     }

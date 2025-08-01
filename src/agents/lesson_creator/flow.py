@@ -1,60 +1,51 @@
 import os
 from src.utils.logger import logger
-from .func import create_slide_data
-from .prompt import create_messages_for_llm
+from .prompt import create_prompt_template
 from src.config.llm import get_llm
+from src.agents.lesson_creator.schemas import SlideDeck
 
 DEFAULT_MODEL = os.getenv("DEFAULT_MODEL")
 
-async def run_slide_creator(topic: str, uploaded_files_content: str = None, model_name: str = DEFAULT_MODEL):
+WORDS_PER_MINUTE = 200
+
+async def run_slide_creator(
+    topic: str, 
+    uploaded_files_content: str = None,
+    model_name: str = DEFAULT_MODEL
+) -> dict:
     """Simplified slide creator focused on topic and file upload only"""
     try:
         logger.info(f"Creating slides for topic: {topic}")
         
-        # Step 1: Build prompt messages (no vector store query needed)
-        prompt_messages = create_messages_for_llm(
-            topic=topic,
-            uploaded_files_content=uploaded_files_content
-        )
-
-        # Step 2: Generate slides with LLM
+        prompt = create_prompt_template()
         llm = get_llm(model_name)
         logger.info(f"Generating slides with {model_name}...")
+
+        structured_llm = llm.with_structured_output(SlideDeck)
+
+        chain = prompt | structured_llm
+
+        slide_deck = await chain.ainvoke({
+            "topic": topic,
+            "uploaded_files_content": uploaded_files_content or ""
+        })
+
+        if not slide_deck:
+            raise ValueError("Model returned None, possibly due to content filtering.")    
         
-        response = await llm.ainvoke(prompt_messages)
+        total_words = sum(len(slide.tts_script.split()) for slide in slide_deck.slides)
+        estimated_duration = round((total_words / WORDS_PER_MINUTE), 1)
         
-        # Step 3: Parse response and create slide data
-        slide_data = create_slide_data(response.content)
+        slide_deck.lesson_info.total_words = total_words
+        slide_deck.lesson_info.estimated_duration_minutes = estimated_duration
         
-        # Step 4: Add basic metadata and calculate word counts
-        if slide_data and "lesson_info" in slide_data:
-            lesson_info = slide_data["lesson_info"]
-            lesson_info["primary_source"] = "file_upload" if uploaded_files_content else "generated_content"
-            lesson_info["target_level"] = "Cấp 3 (lớp 10-12)"
-            
-            # Calculate word counts and duration from tts_script
-            slides = slide_data.get('slides', [])
-            total_words = 0
-            
-            for slide in slides:
-                tts_script = slide.get('tts_script', '')
-                word_count = len(tts_script.split()) if tts_script else 0
-                total_words += word_count
-            
-            # Calculate estimated duration (180 words per minute)
-            estimated_duration_minutes = total_words / 180
-            
-            # Update lesson_info with calculated values
-            lesson_info['total_words'] = total_words
-            lesson_info['estimated_duration_minutes'] = round(estimated_duration_minutes, 1)
-        
-        logger.info(f"Successfully created slides with {slide_data.get('lesson_info', {}).get('slide_count', 0)} slides, {slide_data.get('lesson_info', {}).get('total_words', 0)} words, duration: {slide_data.get('lesson_info', {}).get('estimated_duration_minutes', 0):.1f} minutes")
+        logger.info(f"Successfully created slides. Title: '{slide_deck.lesson_info.title}', Slides: {len(slide_deck.slides)}, Words: {total_words}")
         
         return {
             "success": True,
-            "slide_data": slide_data,
+            "slide_data": slide_deck.model_dump(),
         }
         
     except Exception as e:
-        logger.error(f"Error creating slides: {e}")
+        logger.error(f"Error creating slides: {e}", exc_info=True)
         return {"success": False, "error": str(e), "slide_data": None}

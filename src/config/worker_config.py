@@ -52,6 +52,7 @@ class WorkerConfig:
     # Processing Configuration  
     temp_dir: str = os.getenv("TEMP_DIR", os.path.join(tempfile.gettempdir(), "ai_worker"))
     max_concurrent_tasks: int = int(os.getenv("MAX_CONCURRENT_TASKS", "2"))
+    prefetch_count: int = int(os.getenv("PREFETCH_COUNT", "2"))
     
     def __post_init__(self):
         """Validate configuration after initialization"""

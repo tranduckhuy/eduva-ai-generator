@@ -4,6 +4,9 @@ Product creation handler for generating final products (video/audio) from conten
 import os
 from datetime import datetime
 from typing import Dict, Any
+import shutil
+import asyncio
+import uuid
 
 from src.handlers.base_handler import BaseTaskHandler
 from src.models.task_messages import CreateProductMessage, JobType
@@ -35,6 +38,10 @@ class ProductCreationHandler(BaseTaskHandler):
         try:
             logger.info(f"Starting product creation for job {job_id}")
             
+            workspace_dir = os.path.join(self.config.temp_dir, f"product_job_{job_id}_{uuid.uuid4().hex[:8]}")
+            os.makedirs(workspace_dir, exist_ok=True)
+            logger.info(f"Created unique job directory: {workspace_dir}")
+
             # Step 1: Download content from Azure
             logger.info(f"Downloading content file: {message.contentBlobName}")
             lesson_content = await self.download_json_content(message.contentBlobName)
@@ -42,7 +49,7 @@ class ProductCreationHandler(BaseTaskHandler):
             # Step 2: Generate product based on job type
             logger.info(f"Generating {message.jobType} product")
             local_product_file = await self._generate_product(
-                message, lesson_content
+                message, lesson_content, workspace_dir
             )
 
             duration_seconds = None
@@ -57,7 +64,6 @@ class ProductCreationHandler(BaseTaskHandler):
             # Step 3: Upload product to Azure
             if local_product_file:
                 product_blob_name = f"ai-product/product_{job_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.{self._get_file_extension(message.jobType)}"
-                logger.info(f"Uploading product to: {product_blob_name}")
                 await self.upload_product_file(local_product_file, product_blob_name)
             
             video_output_blob_name = product_blob_name if message.jobType == JobType.VIDEO_LESSON else None
@@ -72,7 +78,7 @@ class ProductCreationHandler(BaseTaskHandler):
             
             await self.notify_success(
                 job_id,
-                JobStatus.Completed,  # Pass the enum value directly
+                JobStatus.Completed,
                 **success_data
             )
             
@@ -93,13 +99,15 @@ class ProductCreationHandler(BaseTaskHandler):
             
         finally:
             # Clean up temporary files
-            if local_product_file:
-                self.cleanup_temp_files(local_product_file)
+            if os.path.exists(workspace_dir):
+                shutil.rmtree(workspace_dir)
+                logger.info(f"Cleaned up main workspace: {workspace_dir}")
     
     async def _generate_product(
         self, 
         message: CreateProductMessage, 
-        lesson_content: Dict[str, Any]
+        lesson_content: Dict[str, Any],
+        workspace_dir: str
     ) -> str:
         """
         Generate the final product based on job type
@@ -113,9 +121,9 @@ class ProductCreationHandler(BaseTaskHandler):
         """
         try:
             if message.jobType == JobType.VIDEO_LESSON:
-                return await self._generate_video(message, lesson_content)
+                return await self._generate_video(message, lesson_content, workspace_dir)
             elif message.jobType == JobType.AUDIO_LESSON:
-                return await self._generate_audio(message, lesson_content)
+                return await self._generate_audio(message, lesson_content, workspace_dir)
             else:
                 raise ValueError(f"Unsupported job type: {message.jobType}")
                 
@@ -126,7 +134,8 @@ class ProductCreationHandler(BaseTaskHandler):
     async def _generate_video(
         self, 
         message: CreateProductMessage, 
-        lesson_content: Dict[str, Any]
+        lesson_content: Dict[str, Any],
+        workspace_dir: str
     ) -> str:
         """
         Generate video from lesson content
@@ -141,28 +150,40 @@ class ProductCreationHandler(BaseTaskHandler):
         try:
             # Prepare voice configuration
             voice_config = message.voiceConfig or {}
-            
+
             # Set default voice config if not provided
             if not voice_config:
                 voice_config = {
-                    "language_code": "vi-VN",
+                    "languageCode": "vi-VN",
                     "name": "vi-VN-Neural2-A",
-                    "speaking_rate": 1.0
+                    "speakingRate": 1.1
                 }
-            
+
+            # Ensure speaking rate is at least 1.0
+            if voice_config.get("speakingRate", 1.0) < 1.1:
+                voice_config["speakingRate"] = 1.1
+
             # Initialize video generator
+            logger.info(f"Voice config for video generation: {voice_config}")
+
             video_generator = VideoGenerator(voice_config=voice_config)
             
             # Generate output path
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+
+            unique_dir = os.path.join(workspace_dir, f"video_{message.jobId}_{timestamp}")
+            os.makedirs(unique_dir, exist_ok=True)
+            logger.info(f"Created unique video directory: {unique_dir}")
+
             output_filename = f"video_{message.jobId}_{timestamp}.mp4"
-            output_path = os.path.join(self.config.temp_dir, output_filename)
-            
+            output_path = os.path.join(unique_dir, output_filename)
+
             # Generate video
             logger.info("Starting video generation...")
             final_video_path = await video_generator.generate_lesson_video(
                 lesson_content, 
-                output_path
+                output_path,
+                temp_dir=unique_dir
             )
             
             logger.info(f"Video generated successfully: {final_video_path}")
@@ -173,9 +194,10 @@ class ProductCreationHandler(BaseTaskHandler):
             raise
     
     async def _generate_audio(
-        self, 
-        message: CreateProductMessage, 
-        lesson_content: Dict[str, Any]
+        self,
+        message: CreateProductMessage,
+        lesson_content: Dict[str, Any],
+        workspace_dir: str
     ) -> str:
         """
         Generate audio from lesson content (simplified version)
@@ -183,14 +205,19 @@ class ProductCreationHandler(BaseTaskHandler):
         try:
             # Voice config
             voice_config = message.voiceConfig or {
-                "language_code": "vi-VN",
+                "languageCode": "vi-VN",
                 "name": "vi-VN-Neural2-A",
-                "speaking_rate": 1.0
+                "speakingRate": 1.0
             }
 
             tts_service = TTSService(voice_config)
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            output_path = os.path.join(self.config.temp_dir, f"audio_{message.jobId}_{timestamp}.mp3")
+
+            # Generate output path
+            unique_dir = os.path.join(workspace_dir, f"audio_{message.jobId}_{timestamp}")
+            os.makedirs(unique_dir, exist_ok=True)
+
+            output_path = os.path.join(unique_dir, f"audio_{message.jobId}_{timestamp}.mp3")
 
             # Process slides
             slides = lesson_content.get("slides", [])
@@ -223,25 +250,19 @@ class ProductCreationHandler(BaseTaskHandler):
 
             # Generate audio từ các chunks
             temp_files = []
+            tasks = []
             for i, chunk in enumerate(chunks):
-                temp_path = os.path.join(self.config.temp_dir, f"temp_{i}_{timestamp}.mp3")
-                await tts_service.generate_audio(chunk, temp_path)
-                temp_files.append(temp_path)
+                temp_path = os.path.join(unique_dir, f"temp_{i}_{uuid.uuid4().hex[:8]}.mp3")
+                tasks.append(tts_service.generate_audio(chunk, temp_path))
+            
+            # Execute all TTS tasks concurrently
+            temp_files = await asyncio.gather(*tasks)
 
-            # Nối các file audio
+            # Concatenate all audio files
             audio_clips = [AudioFileClip(f) for f in temp_files]
             final_audio = concatenate_audioclips(audio_clips)
             final_audio.write_audiofile(output_path)
             
-            # Dọn dẹp
-            for clip in audio_clips:
-                clip.close()
-            for f in temp_files:
-                try:
-                    os.remove(f)
-                except:
-                    pass
-
             return output_path
 
         except Exception as e:

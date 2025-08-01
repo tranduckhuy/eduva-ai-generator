@@ -2,6 +2,7 @@ import asyncio
 import os
 import gc
 import time
+import uuid
 import platform
 from typing import List, Dict, Any
 from concurrent.futures import ThreadPoolExecutor
@@ -9,10 +10,8 @@ from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips, Vid
 from moviepy.audio.AudioClip import AudioArrayClip
 from moviepy.audio.fx.audio_fadeout import audio_fadeout
 import numpy as np
-import tempfile
 import logging
 from contextlib import contextmanager
-import shutil
 import subprocess
 # Import our new helper modules
 from .content_formatter import ContentFormatter
@@ -36,7 +35,7 @@ class VideoGenerator:
         # Performance optimizations
         self.max_workers_optimized = min(3, os.cpu_count())  # Increased concurrency
         self.batch_size_optimized = 3  # Larger batches
-        self.video_fps = 20  # Reduced FPS for faster processing
+        self.video_fps = 15  # Lower FPS for faster processing
         self.image_resolution = (1280, 720)  # Standard HD
         
         # Initialize helper classes
@@ -88,48 +87,28 @@ class VideoGenerator:
                     logger.error(f"File operation failed after {max_retries} attempts: {e}")
                     raise
 
-    async def generate_lesson_video(self, lesson_data: Dict[str, Any], output_path: str) -> str:
+    async def generate_lesson_video(self, lesson_data: Dict[str, Any], output_path: str, temp_dir: str) -> str:
         """Generate complete video from lesson JSON data"""
         try:
             slides = lesson_data.get('slides', [])
             if not slides:
                 raise ValueError("No slides found in lesson data")
             
-            # Validate and normalize output path - ensure it's a proper Windows path
-            output_path = os.path.normpath(os.path.abspath(output_path))
-            os.makedirs(os.path.dirname(output_path), exist_ok=True)
-
-            # Use system TEMP directory - tránh path quá dài
-            temp_dir = tempfile.mkdtemp(prefix='vgen_')
+            logger.info(f"Using provided temporary directory: {temp_dir}")
             
-            try:
-                logger.info(f"Processing {len(slides)} slides...")
-                logger.info(f"Using temporary directory: {temp_dir}")
-                logger.info(f"Output path: {output_path}")
-                
-                # Process all slides concurrently with reduced concurrency
-                slide_video_paths = await self._process_slides_concurrent(slides, temp_dir)
-                
-                # Filter out None values (failed slides)
-                valid_paths = [path for path in slide_video_paths if path and os.path.exists(path)]
-                if not valid_paths:
-                    raise ValueError("No slide videos were successfully created")
-                
-                logger.info(f"Successfully created {len(valid_paths)} out of {len(slides)} slide videos")
-                
-                # Combine all slide videos
-                final_video_path = await self._combine_videos(valid_paths, output_path)
-                
-                logger.info(f"Video generation completed: {final_video_path}")
-                return final_video_path
-            finally:
-                # Clean up temp directory
-                try:
-                    if os.path.exists(temp_dir):
-                        time.sleep(1.0)  
-                        shutil.rmtree(temp_dir, ignore_errors=True)
-                except Exception as e:
-                    logger.warning(f"Could not clean up temp directory: {e}")
+            # Process all slides concurrently with reduced concurrency
+            slide_video_paths = await self._process_slides_concurrent(slides, temp_dir)
+            
+            # Filter out None values (failed slides)
+            valid_paths = [path for path in slide_video_paths if path and os.path.exists(path)]
+            if not valid_paths:
+                raise ValueError("No slide videos were successfully created")
+            
+            # Combine all slide videos
+            final_video_path = await self._combine_videos(valid_paths, output_path)
+            
+            logger.info(f"Video generation completed: {final_video_path}")
+            return final_video_path
                     
         except Exception as e:
             logger.error(f"Error generating lesson video: {e}")
@@ -190,19 +169,22 @@ class VideoGenerator:
 
     def _process_single_slide(self, slide: Dict, slide_index: int, temp_dir: str) -> str:
         """Process a single slide: get images, generate TTS, create video"""
+
+        slide_temp_dir = os.path.join(temp_dir, f"slide_{slide_index + 1}")
+        os.makedirs(slide_temp_dir, exist_ok=True)
+
         try:
             slide_id = slide.get('slide_id', slide_index + 1)
             logger.info(f"Processing slide {slide_id}...")
             
-            # Ensure temp_dir exists and is properly formatted for Windows
-            temp_dir = os.path.normpath(temp_dir)
-            os.makedirs(temp_dir, exist_ok=True)
+            audio_path = os.path.join(slide_temp_dir, f"audio_{slide_id}_{uuid.uuid4().hex[:8]}.mp3")
+            video_path = os.path.join(slide_temp_dir, f"slide_{slide_id}_{uuid.uuid4().hex[:8]}.mp4")
             
-            # Generate audio from TTS with proper path handling
-            audio_filename = f"audio_{slide_id}.mp3"
-            audio_path = os.path.normpath(os.path.join(temp_dir, audio_filename))
-            
-            audio_path = self._generate_tts_audio(
+            # Chuẩn hóa đường dẫn cho Windows để đảm bảo an toàn
+            audio_path = os.path.normpath(audio_path)
+            video_path = os.path.normpath(video_path)
+
+            self._generate_tts_audio(
                 slide.get('tts_script', ''), 
                 audio_path
             )
@@ -222,7 +204,7 @@ class VideoGenerator:
             
             # Process slide images using the optimized approach
             slide_result = self.slide_processor.process_slide_images(
-                slide, temp_dir, slide_id, self.image_resolution
+                slide, slide_temp_dir, slide_id, self.image_resolution
             )
             
             # Calculate optimal timing for images based on audio duration
@@ -232,9 +214,6 @@ class VideoGenerator:
             gc.collect()
             
             # Create video for this slide with proper path handling
-            video_filename = f"slide_{slide_id}.mp4"
-            video_path = os.path.normpath(os.path.join(temp_dir, video_filename))
-            
             self._create_slide_video_with_timing(slide_result, audio_path, video_path)
             
             # Final cleanup

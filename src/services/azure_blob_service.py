@@ -59,8 +59,10 @@ class AzureBlobService:
             logger.error(f"Failed to upload file to Azure Blob: {e}")
             raise
     
-    async def download_file(self, container_name: str, blob_name: str, 
-                           local_path: Optional[str] = None) -> str:
+    async def download_file(
+            self, container_name: str, 
+            blob_name: str,
+            local_path: Optional[str] = None) -> str:
         """
         Download a file from Azure Blob Storage
         

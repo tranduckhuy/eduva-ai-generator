@@ -2,7 +2,7 @@
 Content generation handler for processing source files into lesson content
 """
 import os
-import json
+import asyncio
 from datetime import datetime
 from typing import Dict, Any, List
 from langchain_community.document_loaders import PyMuPDFLoader, Docx2txtLoader, UnstructuredFileLoader
@@ -35,15 +35,11 @@ class ContentGenerationHandler(BaseTaskHandler):
             logger.info(f"Starting content generation for job {job_id}")
             
             # Step 1: Download source files
-            logger.info(f"Downloading {len(message.sourceBlobNames)} source files")
             local_source_files = await self.download_multiple_source_files(message.sourceBlobNames)
             
-            # Step 2: Extract and combine content from all files
-            logger.info("Extracting content from source files")
             file_content = await self._extract_multiple_files_content(local_source_files)
             
             # Step 3: Generate lesson content 
-            logger.info(f"Generating lesson content")
             lesson_content = await self._generate_lesson_content(
                 message, file_content
             )
@@ -130,7 +126,12 @@ class ContentGenerationHandler(BaseTaskHandler):
             else:
                 loader = UnstructuredFileLoader(file_path)
             
-            documents = loader.load()
+            loop = asyncio.get_running_loop()
+            # documents = loader.load()
+            documents = await loop.run_in_executor(
+                None,
+                loader.load
+            )
             content = "\n".join([doc.page_content for doc in documents])
             
             logger.info(f"Extracted {len(content)} characters from {file_extension} file")
@@ -159,7 +160,6 @@ class ContentGenerationHandler(BaseTaskHandler):
                 combined_content.append(f"=== Content from {filename} ===\n{content}\n")
             
             result = "\n".join(combined_content)
-            logger.info(f"Combined content from {len(file_paths)} files: {len(result)} characters")
             return result
             
         except Exception as e:
@@ -184,7 +184,7 @@ class ContentGenerationHandler(BaseTaskHandler):
         try:
             # Use the provided topic (required)
             topic = message.topic
-            
+
             # Generate slides using existing slide creator
             result = await run_slide_creator(
                 topic=topic,
@@ -202,8 +202,7 @@ class ContentGenerationHandler(BaseTaskHandler):
                 "source_blob_names": message.sourceBlobNames,
                 "topic": message.topic,
                 "generated_at": datetime.now().isoformat(),
-                "source_content_length": len(file_content),
-                "has_source_files": True
+                "source_content_length": len(file_content)
             }
             
             # Ensure lesson_info exists
@@ -213,14 +212,12 @@ class ContentGenerationHandler(BaseTaskHandler):
             # Add job-specific metadata to lesson_info
             lesson_info = lesson_data["lesson_info"]
             lesson_info["topic"] = message.topic
-            lesson_info["source_type"] = "file_upload"
             lesson_info["source_files_count"] = len(message.sourceBlobNames)
             
             logger.info(f"Generated lesson with {len(lesson_data.get('slides', []))} slides")
             return lesson_data
             
         except Exception as e:
-            logger.error(f"Failed to generate lesson content: {e}")
             raise
     
     def _calculate_word_count(self, lesson_content: Dict[str, Any]) -> int:

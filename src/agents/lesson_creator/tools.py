@@ -4,13 +4,9 @@ from src.utils.helper import convert_list_context_source_to_str
 from src.utils.logger import logger
 
 @tool
-def retrieve_document(query: str, subject: str = None, grade: str = None):
+def retrieve_document(query: str) -> dict:
     """
-    Truy xuất tài liệu giáo dục từ kho vector của nhà trường dựa trên nội dung truy vấn (chủ đề, môn học...).
-    Args:
-        query: Nội dung truy vấn chính
-        subject: Môn học để filter metadata (Toán, Văn, Anh, Lý, Hóa, Sinh, Sử, Địa, GDCD, Công nghệ, GDTC, GDQP)
-        grade: Lớp/cấp để filter metadata (10, 11, 12)
+    Retrieve relevant documents from the vector store based on the query.
     """
     # Build metadata filter
     metadata_filter = {}
