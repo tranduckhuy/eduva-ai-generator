@@ -14,9 +14,9 @@ class LessonInfo(BaseModel):
     title: str = Field(..., description="Tiêu đề chính của toàn bộ bài giảng.")
     slide_count: int = Field(..., description="Tổng số slide trong bài giảng.")
     target_level: str = Field(..., description="Đối tượng học sinh mục tiêu (ví dụ: 'Cấp 3 (lớp 10-12)').")
-    primary_source: str = Field("generated_content", description="Nguồn tạo nội dung chính ('file_upload' hoặc 'generated_content').")
     total_words: int = Field(0, description="Tổng số từ trong tất cả các tts_script.")
     estimated_duration_minutes: float = Field(0.0, description="Thời lượng dự kiến của bài giảng (phút).")
+    language: str = Field("vi-VN", description="Ngôn ngữ của bài giảng, mặc định là tiếng Việt.")
 
 class SlideDeck(BaseModel):
     """Cấu trúc JSON hoàn chỉnh cho một bộ slide bài giảng."""

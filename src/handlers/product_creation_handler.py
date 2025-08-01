@@ -156,12 +156,12 @@ class ProductCreationHandler(BaseTaskHandler):
                 voice_config = {
                     "languageCode": "vi-VN",
                     "name": "vi-VN-Neural2-A",
-                    "speakingRate": 1.0
+                    "speakingRate": 1.1
                 }
 
             # Ensure speaking rate is at least 1.0
-            if voice_config.get("speakingRate", 1.0) < 1.0:
-                voice_config["speakingRate"] = 1.0
+            if voice_config.get("speakingRate", 1.0) < 1.1:
+                voice_config["speakingRate"] = 1.1
 
             # Initialize video generator
             logger.info(f"Voice config for video generation: {voice_config}")

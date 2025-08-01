@@ -202,8 +202,7 @@ class ContentGenerationHandler(BaseTaskHandler):
                 "source_blob_names": message.sourceBlobNames,
                 "topic": message.topic,
                 "generated_at": datetime.now().isoformat(),
-                "source_content_length": len(file_content),
-                "has_source_files": True
+                "source_content_length": len(file_content)
             }
             
             # Ensure lesson_info exists
@@ -213,7 +212,6 @@ class ContentGenerationHandler(BaseTaskHandler):
             # Add job-specific metadata to lesson_info
             lesson_info = lesson_data["lesson_info"]
             lesson_info["topic"] = message.topic
-            lesson_info["source_type"] = "file_upload"
             lesson_info["source_files_count"] = len(message.sourceBlobNames)
             
             logger.info(f"Generated lesson with {len(lesson_data.get('slides', []))} slides")

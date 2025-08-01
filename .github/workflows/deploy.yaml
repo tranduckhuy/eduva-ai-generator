@@ -43,6 +43,8 @@ jobs:
           echo "DLQ_MONITORING_ENABLED=${{ secrets.DLQ_MONITORING_ENABLED }}" >> .env
           echo "DLQ_ALERT_THRESHOLD=${{ secrets.DLQ_ALERT_THRESHOLD }}" >> .env
           echo "MAX_RETRIES=${{ secrets.MAX_RETRIES }}" >> .env
+          echo "MAX_CONCURRENT_TASKS=${{ secrets.MAX_CONCURRENT_TASKS }}" >> .env
+          echo "PREFETCH_COUNT=${{ secrets.PREFETCH_COUNT }}" >> .env
           echo "AZURE_STORAGE_CONNECTION_STRING=${{ secrets.AZURE_STORAGE_CONNECTION_STRING }}" >> .env
           echo "AZURE_INPUT_CONTAINER=${{ secrets.AZURE_INPUT_CONTAINER }}" >> .env
           echo "AZURE_OUTPUT_CONTAINER=${{ secrets.AZURE_OUTPUT_CONTAINER }}" >> .env

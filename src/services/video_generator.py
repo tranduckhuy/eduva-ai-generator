@@ -35,7 +35,7 @@ class VideoGenerator:
         # Performance optimizations
         self.max_workers_optimized = min(3, os.cpu_count())  # Increased concurrency
         self.batch_size_optimized = 3  # Larger batches
-        self.video_fps = 20  # Reduced FPS for faster processing
+        self.video_fps = 15  # Lower FPS for faster processing
         self.image_resolution = (1280, 720)  # Standard HD
         
         # Initialize helper classes

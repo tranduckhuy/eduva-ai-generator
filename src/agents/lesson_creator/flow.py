@@ -17,7 +17,6 @@ async def run_slide_creator(
     try:
         logger.info(f"Creating slides for topic: {topic}")
         
-        # Step 1: Build prompt messages (no vector store query needed)
         prompt = create_prompt_template()
         llm = get_llm(model_name)
         logger.info(f"Generating slides with {model_name}...")
@@ -39,7 +38,6 @@ async def run_slide_creator(
         
         slide_deck.lesson_info.total_words = total_words
         slide_deck.lesson_info.estimated_duration_minutes = estimated_duration
-        slide_deck.lesson_info.primary_source = "file_upload"
         
         logger.info(f"Successfully created slides. Title: '{slide_deck.lesson_info.title}', Slides: {len(slide_deck.slides)}, Words: {total_words}")
         

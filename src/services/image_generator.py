@@ -127,12 +127,19 @@ class ImageGenerator:
                 negative_prompt="text, watermark, blurry, low quality"
             )
             
-            images.images[0].save(location=output_path)
+            if images.images:
+                images.images[0].save(location=output_path)
+
+                if os.path.exists(output_path):
+                    logger.info(f"🖼️ AI image saved successfully to {output_path}")
+                    return output_path
+                else:
+                    logger.error("❌ Failed to save the image to disk.")
+                    return None
+            else:
+                logger.warning(f"⚠️ AI model returned no images for prompt: '{prompt}'. This might be due to a safety filter.")
+                return None
             
-            if os.path.exists(output_path):
-                logger.info(f"🖼️ AI image saved successfully to {output_path}")
-                return output_path
-            return None
         except Exception as e:
             logger.error(f"❌ AI image generation failed for prompt '{prompt}': {e}")
             return None

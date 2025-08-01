@@ -15,22 +15,8 @@ from src.services.backend_api_client import BackendApiClient
 class TaskDispatcher:
     """Dispatcher for routing tasks to appropriate handlers"""
     
-    def __init__(self, config: WorkerConfig, session: aiohttp.ClientSession):
-        self.config = config
-        
-
-        backend_client = BackendApiClient(
-            session=session,
-            base_url=config.backend_api_base_url,
-            api_key=config.backend_api_key
-        )
-
-        # Initialize handlers
-        self.handlers: Dict[TaskType, BaseTaskHandler] = {
-            TaskType.GENERATE_CONTENT: ContentGenerationHandler(config, backend_client),
-            TaskType.CREATE_PRODUCT: ProductCreationHandler(config, backend_client)
-        }
-        
+    def __init__(self, handlers: Dict[TaskType, BaseTaskHandler]):
+        self.handlers = handlers
         logger.info(f"Task dispatcher initialized with {len(self.handlers)} handlers")
     
     async def dispatch_task(self, message_body: Dict) -> bool:
