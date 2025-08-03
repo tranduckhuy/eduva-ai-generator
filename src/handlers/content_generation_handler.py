@@ -11,15 +11,20 @@ from src.handlers.base_handler import BaseTaskHandler
 from src.models.task_messages import GenerateContentMessage
 from src.agents.lesson_creator.flow import run_slide_creator
 from src.config.job_status import JobStatus
+from src.services.simple_document_processor import SimpleDocumentProcessor
 from src.utils.logger import logger
 
 
 class ContentGenerationHandler(BaseTaskHandler):
-    """Handler for generate_content tasks"""
+    """Handler for generate_content tasks with simple document processing"""
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.document_processor = SimpleDocumentProcessor()
     
     async def process(self, message: GenerateContentMessage) -> bool:
         """
-        Process content generation task
+        Process content generation task with simple document handling
         
         Args:
             message: Content generation message
@@ -37,11 +42,19 @@ class ContentGenerationHandler(BaseTaskHandler):
             # Step 1: Download source files
             local_source_files = await self.download_multiple_source_files(message.sourceBlobNames)
             
-            file_content = await self._extract_multiple_files_content(local_source_files)
+            # Step 2: Extract and combine content from all files
+            combined_content = await self._extract_multiple_files_content(local_source_files)
             
-            # Step 3: Generate lesson content 
+            # Step 3: Process content to fit within limits
+            processed_content = await self.document_processor.process_content(
+                combined_content, message.topic
+            )
+            
+            logger.info(f"Content processing complete: {len(processed_content)} characters")
+            
+            # Step 4: Generate lesson content with processed content
             lesson_content = await self._generate_lesson_content(
-                message, file_content
+                message, processed_content
             )
 
             # Preview content generation
@@ -160,6 +173,8 @@ class ContentGenerationHandler(BaseTaskHandler):
                 combined_content.append(f"=== Content from {filename} ===\n{content}\n")
             
             result = "\n".join(combined_content)
+            logger.info(f"Combined content from {len(file_paths)} files: {len(result)} characters")
+            
             return result
             
         except Exception as e:
