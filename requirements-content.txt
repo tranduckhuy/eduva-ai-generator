@@ -1,6 +1,7 @@
 # Content Worker Requirements - Only essentials for content generation
 python-dotenv
 loguru
+pytz
 aiohttp
 aio-pika
 azure-storage-blob

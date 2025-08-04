@@ -4,15 +4,13 @@ Test TTS Service functionality
 import asyncio
 import os
 import time
-import logging
 from src.services.tts_service import TTSService, create_tts_service, text_to_speech_file, estimate_speech_duration
-
-logging.basicConfig(level=logging.INFO)
+from src.utils.logger import logger
 
 async def test_tts_service():
     """Test TTS Service with different configurations"""
     
-    print("=== Testing TTS Service ===")
+    logger.info("=== Testing TTS Service ===")
     
     # Test data
     test_texts = [

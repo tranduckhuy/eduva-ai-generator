@@ -4,13 +4,11 @@ Performance test for optimized video generation
 import asyncio
 import json
 import os
-import logging
 import psutil
 import time
 from datetime import datetime
 from src.services.video_generator import VideoGenerator
-
-logging.basicConfig(level=logging.INFO)
+from src.utils.logger import logger
 
 def get_memory_usage():
     """Get current memory usage in MB"""

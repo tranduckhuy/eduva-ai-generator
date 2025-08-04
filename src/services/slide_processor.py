@@ -4,11 +4,9 @@ Slide processing utilities for video generation
 import os
 import uuid
 from typing import List, Dict, Any
-import logging
 from .image_generator import ImageGenerator
 from .content_formatter import ContentFormatter
-
-logger = logging.getLogger(__name__)
+from src.utils.logger import logger
 
 class SlideProcessor:
     """Handles processing of individual slides including image generation and timing"""

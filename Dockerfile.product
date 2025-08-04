@@ -13,6 +13,10 @@ RUN apt-get update && apt-get install -y \
     libfontconfig1 \
     libxrender1 \
     libgl1-mesa-glx \
+    fonts-liberation \
+    fonts-dejavu-core \
+    fonts-dejavu-extra \
+    fonts-noto \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy and install Python dependencies (full set for video/audio processing)
@@ -24,7 +28,7 @@ COPY src/ ./src/
 COPY product_worker.py .
 
 # Create credentials and temp directories
-RUN mkdir -p /app/credentials /tmp/video_temp
+RUN mkdir -p /app/credentials /tmp/ai_worker
 
 # Environment setup
 ENV PYTHONPATH=/app

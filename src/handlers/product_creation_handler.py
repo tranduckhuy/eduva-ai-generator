@@ -4,7 +4,6 @@ Product creation handler for generating final products (video/audio) from conten
 import os
 from datetime import datetime
 from typing import Dict, Any
-import shutil
 import asyncio
 import uuid
 
@@ -17,7 +16,6 @@ from src.utils.temp_cleanup import force_cleanup_workspace
 from src.services.tts_service import TTSService
 from src.services.tts_service import TTSService
 from moviepy.editor import concatenate_audioclips, AudioFileClip, VideoFileClip
-
 
 class ProductCreationHandler(BaseTaskHandler):
     """Handler for create_product tasks"""

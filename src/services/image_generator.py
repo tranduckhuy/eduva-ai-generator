@@ -6,12 +6,11 @@ import platform
 import requests
 from typing import List, Dict, Any, Optional
 from PIL import Image, ImageDraw, ImageFont
-import logging
 from .slide_templates import SlideTemplateManager
 import vertexai
 from vertexai.preview.vision_models import ImageGenerationModel
+from src.utils.logger import logger
 
-logger = logging.getLogger(__name__)
 PROJECT_ID = os.getenv("GOOGLE_CLOUD_PROJECT")
 LOCATION = os.getenv("GOOGLE_CLOUD_LOCATION", "us-central1")
 IMAGE_GENERATION_MODEL = os.getenv("IMAGE_GENERATION_MODEL", "imagen-3.0-generate-001")

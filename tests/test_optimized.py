@@ -4,14 +4,12 @@ Performance test using the OPTIMIZED original VideoGenerator
 import asyncio
 import json
 import os
-import logging
 import psutil
 import time
 from datetime import datetime
 from src.services.video_generator import VideoGenerator  # Using the optimized original
 from src.services.tts_service import estimate_speech_duration
-
-logging.basicConfig(level=logging.INFO)
+from src.utils.logger import logger
 
 from dotenv import load_dotenv
 load_dotenv()

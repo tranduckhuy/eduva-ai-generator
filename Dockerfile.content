@@ -17,9 +17,6 @@ RUN pip install --no-cache-dir -r requirements-content.txt
 COPY src/ ./src/
 COPY content_worker.py .
 
-# Create credentials directory
-RUN mkdir -p /app/credentials
-
 # Environment setup
 ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1

@@ -10,15 +10,13 @@ from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips, Vid
 from moviepy.audio.AudioClip import AudioArrayClip
 from moviepy.audio.fx.audio_fadeout import audio_fadeout
 import numpy as np
-import logging
 from contextlib import contextmanager
 import subprocess
 # Import our new helper modules
 from .content_formatter import ContentFormatter
 from .slide_processor import SlideProcessor
 from .tts_service import TTSService
-
-logger = logging.getLogger(__name__)
+from src.utils.logger import logger
 
 class VideoGenerator:
     def __init__(self, unsplash_access_key: str = None, voice_config: Dict[str, Any] = None):

@@ -6,13 +6,11 @@ Google Cloud Text-to-Speech Service
 import os
 import time
 import tempfile
-import logging
 from typing import Dict, Any, Optional, List
 from google.cloud import texttospeech
 from moviepy.editor import AudioClip
 import asyncio
-
-logger = logging.getLogger(__name__)
+from src.utils.logger import logger
 
 class TTSService:
     """Google Cloud Text-to-Speech Service"""

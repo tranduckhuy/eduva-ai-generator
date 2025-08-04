@@ -1,0 +1,32 @@
+# Content Worker Only - Lightweight VPS
+services:
+  content-worker:
+    image: ghcr.io/tranduckhuy/eduva-ai-content-worker:latest
+    container_name: content-worker
+    environment:
+      # RabbitMQ Configuration
+      RABBITMQ_URI: ${RABBITMQ_URI}
+      QUEUE_NAME: ${QUEUE_NAME}
+      EXCHANGE_NAME: ${EXCHANGE_NAME}
+      ROUTING_KEY: ${ROUTING_KEY}
+
+      # Storage Configuration
+      AZURE_STORAGE_CONNECTION_STRING: ${AZURE_STORAGE_CONNECTION_STRING}
+      AZURE_INPUT_CONTAINER: ${AZURE_INPUT_CONTAINER}
+      AZURE_OUTPUT_CONTAINER: ${AZURE_OUTPUT_CONTAINER}
+
+      # Backend Communication
+      BACKEND_API_BASE_URL: ${BACKEND_API_BASE_URL}
+      BACKEND_API_KEY: ${BACKEND_API_KEY}
+
+      # AI Configuration (Content generation only)
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY}
+      DEFAULT_MODEL: ${DEFAULT_MODEL}
+
+      # Prefetch Count for RabbitMQ
+      PREFETCH_COUNT: ${PREFETCH_COUNT}
+
+    volumes:
+      - /etc/huytde_work/credentials:/app/credentials:ro
+
+    restart: unless-stopped

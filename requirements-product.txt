@@ -1,5 +1,6 @@
 # Product Worker Dependencies - Full set for video/audio processing
 python-dotenv
+pytz
 loguru
 aiohttp
 aio-pika

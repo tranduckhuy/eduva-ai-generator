@@ -4,10 +4,8 @@ Slide Templates for beautiful video generation
 from typing import Dict, Any, List
 from PIL import Image, ImageDraw, ImageFont
 import os
-import logging
 import random
-
-logger = logging.getLogger(__name__)
+from src.utils.logger import logger
 
 class SlideTemplate:
     """Base class for slide templates"""

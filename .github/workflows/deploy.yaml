@@ -1,72 +1,135 @@
-name: Deploy Eduva AI Generator Image
+name: Deploy Workers to Separate VPS
 
 on:
   workflow_run:
-    workflows: ["Publish Eduva AI Generator Image"]
+    workflows: ["Publish Eduva AI Workers Images"]
     types:
       - completed
   workflow_dispatch:
 
 jobs:
-  deploy:
-    name: Deploy AI Generator Worker
-    runs-on: self-hosted
-
-    # Only run if the previous workflow run was successful or if manually triggered
+  deploy-content-worker:
+    name: Deploy Content Worker to VPS 1
+    runs-on: ubuntu-latest
     if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
-
-    permissions:
-      contents: read
-      packages: write
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@v3
+      - name: Read version from file
+        id: version
+        run: |
+          VERSION=$(cat version.txt)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "🚀 Deploying Content Worker version: $VERSION"
+
+      - name: Create environment file
+        run: |
+          cat <<EOF > .env.content
+          RABBITMQ_URI=${{ secrets.RABBITMQ_URI }}
+          QUEUE_NAME=${{ secrets.CONTENT_QUEUE_NAME }}
+          EXCHANGE_NAME=${{ secrets.EXCHANGE_NAME }}
+          ROUTING_KEY=${{ secrets.CONTENT_ROUTING_KEY }}
+          AZURE_STORAGE_CONNECTION_STRING=${{ secrets.AZURE_STORAGE_CONNECTION_STRING }}
+          AZURE_INPUT_CONTAINER=${{ secrets.AZURE_INPUT_CONTAINER }}
+          AZURE_OUTPUT_CONTAINER=${{ secrets.AZURE_OUTPUT_CONTAINER }}
+          BACKEND_API_BASE_URL=${{ secrets.BACKEND_API_BASE_URL }}
+          BACKEND_API_KEY=${{ secrets.BACKEND_API_KEY }}
+          GOOGLE_API_KEY=${{ secrets.GOOGLE_API_KEY }}
+          DEFAULT_MODEL=${{ secrets.DEFAULT_MODEL }}
+          PREFETCH_COUNT=${{ secrets.CONTENT_PREFETCH_COUNT }}
+          IMAGE_TAG=${{ steps.version.outputs.version }}
+          EOF
+
+      - name: Transfer files to VPS 1
+        uses: appleboy/scp-action@master
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          host: ${{ secrets.VPS1_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: "docker-compose.content.yaml,.env.content"
+          target: "/opt/eduva-ai-content/"
 
-      - name: Setup Docker Compose environment
-        run: |
-          echo "Setting up Docker Compose environment..."
-          echo "RABBITMQ_URI=${{ secrets.RABBITMQ_URI }}" >> .env
-          echo "AI_TASK_QUEUE=${{ secrets.AI_TASK_QUEUE }}" >> .env
-          echo "MAIN_EXCHANGE=${{ secrets.MAIN_EXCHANGE }}" >> .env
-          echo "ROUTING_KEY=${{ secrets.ROUTING_KEY }}" >> .env
-          echo "DLQ_QUEUE=${{ secrets.DLQ_QUEUE }}" >> .env
-          echo "DLQ_EXCHANGE=${{ secrets.DLQ_EXCHANGE }}" >> .env
-          echo "DLQ_ROUTING_KEY=${{ secrets.DLQ_ROUTING_KEY }}" >> .env
-          echo "DLQ_MONITORING_ENABLED=${{ secrets.DLQ_MONITORING_ENABLED }}" >> .env
-          echo "DLQ_ALERT_THRESHOLD=${{ secrets.DLQ_ALERT_THRESHOLD }}" >> .env
-          echo "MAX_RETRIES=${{ secrets.MAX_RETRIES }}" >> .env
-          echo "MAX_CONCURRENT_TASKS=${{ secrets.MAX_CONCURRENT_TASKS }}" >> .env
-          echo "PREFETCH_COUNT=${{ secrets.PREFETCH_COUNT }}" >> .env
-          echo "AZURE_STORAGE_CONNECTION_STRING=${{ secrets.AZURE_STORAGE_CONNECTION_STRING }}" >> .env
-          echo "AZURE_INPUT_CONTAINER=${{ secrets.AZURE_INPUT_CONTAINER }}" >> .env
-          echo "AZURE_OUTPUT_CONTAINER=${{ secrets.AZURE_OUTPUT_CONTAINER }}" >> .env
-          echo "BACKEND_API_BASE_URL=${{ secrets.BACKEND_API_BASE_URL }}" >> .env
-          echo "BACKEND_API_KEY=${{ secrets.BACKEND_API_KEY }}" >> .env
-          echo "GOOGLE_API_KEY=${{ secrets.GOOGLE_API_KEY }}" >> .env
-          echo "DEFAULT_MODEL=${{ secrets.DEFAULT_MODEL }}" >> .env
-          echo "GOOGLE_APPLICATION_CREDENTIALS=${{ secrets.GOOGLE_APPLICATION_CREDENTIALS }}" >> .env
-          echo "GOOGLE_CLOUD_PROJECT=${{ secrets.GOOGLE_CLOUD_PROJECT }}" >> .env
-          echo "GOOGLE_CLOUD_LOCATION=${{ secrets.GOOGLE_CLOUD_LOCATION }}" >> .env
-          echo "IMAGE_GENERATION_MODEL=${{ secrets.IMAGE_GENERATION_MODEL }}" >> .env
-          echo "UNSPLASH_ACCESS_KEY=${{ secrets.UNSPLASH_ACCESS_KEY }}" >> .env
-          echo "PINECONE_API_KEY=${{ secrets.PINECONE_API_KEY }}" >> .env
-          echo "PINECONE_INDEX_NAME=${{ secrets.PINECONE_INDEX_NAME }}" >> .env
-          echo "Docker Compose environment setup completed."
+      - name: Deploy Content Worker to VPS 1
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.VPS1_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            # Navigate to deployment directory
+            cd /opt/eduva-ai-content
 
-      - name: Deploy with Docker Compose
+            # Login to GitHub Container Registry
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+            # Pull latest image and deploy
+            docker compose -f docker-compose.content.yaml --env-file .env.content pull
+            docker compose -f docker-compose.content.yaml --env-file .env.content up -d --force-recreate
+            docker image prune -f
+            echo "✅ Content Worker deployed successfully to VPS 1"
+
+  deploy-product-worker:
+    name: Deploy Product Worker to VPS 2
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Read version from file
+        id: version
         run: |
-          echo "Pulling latest Docker images..."
-          docker compose pull
-          echo "Recreating containers with latest images..."
-          docker compose -f docker-compose.yaml up --force-recreate --build -d
-          echo "Cleaning up unused Docker images..."
-          docker image prune -f
-          echo "Deployment completed successfully."
+          VERSION=$(cat version.txt)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "🚀 Deploying Product Worker version: $VERSION"
+
+      - name: Create environment file
+        run: |
+          cat <<EOF > .env.product
+          RABBITMQ_URI=${{ secrets.RABBITMQ_URI }}
+          QUEUE_NAME=${{ secrets.PRODUCT_QUEUE_NAME }}
+          EXCHANGE_NAME=${{ secrets.EXCHANGE_NAME }}
+          ROUTING_KEY=${{ secrets.PRODUCT_ROUTING_KEY }}
+          AZURE_STORAGE_CONNECTION_STRING=${{ secrets.AZURE_STORAGE_CONNECTION_STRING }}
+          AZURE_INPUT_CONTAINER=${{ secrets.AZURE_INPUT_CONTAINER }}
+          AZURE_OUTPUT_CONTAINER=${{ secrets.AZURE_OUTPUT_CONTAINER }}
+          BACKEND_API_BASE_URL=${{ secrets.BACKEND_API_BASE_URL }}
+          BACKEND_API_KEY=${{ secrets.BACKEND_API_KEY }}
+          GOOGLE_APPLICATION_CREDENTIALS=${{ secrets.GOOGLE_APPLICATION_CREDENTIALS }}
+          GOOGLE_CLOUD_PROJECT=${{ secrets.GOOGLE_CLOUD_PROJECT }}
+          GOOGLE_CLOUD_LOCATION=${{ secrets.GOOGLE_CLOUD_LOCATION }}
+          IMAGE_GENERATION_MODEL=${{ secrets.IMAGE_GENERATION_MODEL }}
+          UNSPLASH_ACCESS_KEY=${{ secrets.UNSPLASH_ACCESS_KEY }}
+          PREFETCH_COUNT=${{ secrets.PRODUCT_PREFETCH_COUNT }}
+          IMAGE_TAG=${{ steps.version.outputs.version }}
+          EOF
+
+      - name: Transfer files to VPS 2
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.VPS2_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: "docker-compose.product.yaml,.env.product"
+          target: "/opt/eduva-ai-product/"
+
+      - name: Deploy Product Worker to VPS 2
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.VPS2_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd /opt/eduva-ai-product
+
+            # Login to GitHub Container Registry
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+            # Pull latest image and deploy
+            docker compose -f docker-compose.product.yaml --env-file .env.product pull
+            docker compose -f docker-compose.product.yaml --env-file .env.product up -d --force-recreate
+            docker image prune -f
+            echo "✅ Product Worker deployed successfully to VPS 2"

@@ -15,16 +15,6 @@ from src.config.job_status import JobStatus
 
 
 class BaseTaskHandler(ABC):
-    """Base class for task handlers"""
-    
-    # def __init__(self, config: WorkerConfig):
-    #     """Initialize base task handler"""
-    #     self.config = config
-    #     self.azure_service = AzureBlobService(config.azure_storage_connection_string)
-    #     self.backend_client = BackendApiClient(
-    #         config.backend_api_base_url, 
-    #         config.backend_api_key
-    #     )
 
     def __init__(self, config: WorkerConfig, backend_client: BackendApiClient):
         """Initialize base task handler with shared clients."""
@@ -46,16 +36,6 @@ class BaseTaskHandler(ABC):
         pass
     
     async def download_source_file(self, blob_name: str, local_path: Optional[str] = None) -> str:
-        """
-        Download source file from Azure Blob Storage input container
-        
-        Args:
-            blob_name: Name of the blob to download
-            local_path: Local path to save the file (optional)
-            
-        Returns:
-            str: Local path to the downloaded file
-        """
         try:
             # Use input container for source files
             container_name = self.config.azure_input_container
@@ -84,15 +64,6 @@ class BaseTaskHandler(ABC):
             raise
     
     async def download_multiple_source_files(self, blob_names: List[str]) -> List[str]:
-        """
-        Download multiple source files from Azure Blob Storage input container
-        
-        Args:
-            blob_names: List of blob names to download
-            
-        Returns:
-            List[str]: List of local paths to downloaded files
-        """
         try:
             local_paths = []
             
@@ -108,16 +79,6 @@ class BaseTaskHandler(ABC):
             raise
 
     async def upload_content_file(self, local_path: str, blob_name: str) -> str:
-        """
-        Upload content file to Azure Blob Storage temp container (JSON lesson content)
-        
-        Args:
-            local_path: Local path to the file to upload
-            blob_name: Name of the blob in storage
-            
-        Returns:
-            str: URL of the uploaded blob
-        """
         try:
             # Use temp container for intermediate content (JSON)
             container_name = self.config.azure_input_container
@@ -149,16 +110,6 @@ class BaseTaskHandler(ABC):
             raise
     
     async def upload_product_file(self, local_path: str, blob_name: str) -> str:
-        """
-        Upload final product file to Azure Blob Storage (final video/audio)
-        
-        Args:
-            local_path: Local path to the file to upload
-            blob_name: Name of the blob in storage
-            
-        Returns:
-            str: URL of the uploaded blob
-        """
         try:
             # Use output container for final products (video/audio)
             container_name = self.config.azure_output_container
@@ -188,16 +139,6 @@ class BaseTaskHandler(ABC):
             raise
     
     async def upload_json_content(self, content: Dict[str, Any], blob_name: str) -> str:
-        """
-        Upload JSON content directly to Azure Blob Storage temp container
-        
-        Args:
-            content: JSON content to upload
-            blob_name: Name of the blob in storage
-            
-        Returns:
-            str: URL of the uploaded blob
-        """
         try:
             # Use temp container for JSON content
             container_name = self.config.azure_input_container
@@ -220,15 +161,6 @@ class BaseTaskHandler(ABC):
             raise
     
     async def download_json_content(self, blob_name: str) -> Dict[str, Any]:
-        """
-        Download and parse JSON content from Azure Blob Storage temp container
-        
-        Args:
-            blob_name: Name of the blob to download
-            
-        Returns:
-            Dict[str, Any]: Parsed JSON content
-        """
         try:
             # Download from temp container
             container_name = self.config.azure_input_container
@@ -254,15 +186,6 @@ class BaseTaskHandler(ABC):
             raise
 
     async def delete_blob(self, container_name: str, blob_name: str) -> bool:
-        """
-        Delete a blob from Azure Blob Storage
-        
-        Args:
-            blob_name: Name of the blob to delete
-            
-        Returns:
-            bool: True if deletion was successful, False otherwise
-        """
         try:
             return await self.azure_service.delete_blob(container_name, blob_name)
         except Exception as e:
@@ -271,17 +194,6 @@ class BaseTaskHandler(ABC):
 
     
     async def notify_success(self, job_id: str, status: JobStatus, **kwargs) -> bool:
-        """
-        Notify backend of successful task completion
-        
-        Args:
-            job_id: ID of the job
-            status: JobStatus enum value
-            **kwargs: Additional data
-            
-        Returns:
-            bool: True if notification was successful
-        """
         try:
             # async with self.backend_client:
             #     success = await self.backend_client.update_job_success(
@@ -303,16 +215,6 @@ class BaseTaskHandler(ABC):
             return False
     
     async def notify_failure(self, job_id: str, failure_reason: str) -> bool:
-        """
-        Notify backend of task failure
-        
-        Args:
-            job_id: ID of the job
-            failure_reason: Detailed error message
-            
-        Returns:
-            bool: True if notification was successful
-        """
         try:
             # async with self.backend_client:
             #     success = await self.backend_client.update_job_failure(

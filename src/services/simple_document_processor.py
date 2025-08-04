@@ -3,7 +3,6 @@ from typing import Dict, Any
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from src.utils.logger import logger
 
-
 class SimpleDocumentProcessor:
     """Production-ready document processor optimized"""
     

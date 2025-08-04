@@ -90,7 +90,7 @@ class ContentGenerationHandler(BaseTaskHandler):
 
             success = await self.notify_success(
                 job_id, 
-                JobStatus.ContentGenerated,  # Use enum directly
+                JobStatus.ContentGenerated,
                 **success_data
             )
 
@@ -116,7 +116,6 @@ class ContentGenerationHandler(BaseTaskHandler):
             logger.error(error_message)
 
             # Delete blob file on Azure if it was uploaded
-
             if content_blob_name:
                 success = await self.delete_blob(self.config.azure_input_container, content_blob_name)
                 logger.error(f"Deleted blob file: {content_blob_name} due to error - Delete status: {success}")
@@ -151,7 +150,6 @@ class ContentGenerationHandler(BaseTaskHandler):
                 loader = UnstructuredFileLoader(file_path)
             
             loop = asyncio.get_running_loop()
-            # documents = loader.load()
             documents = await loop.run_in_executor(
                 None,
                 loader.load
@@ -208,7 +206,6 @@ class ContentGenerationHandler(BaseTaskHandler):
             Dict containing the generated lesson content
         """
         try:
-            # Use the provided topic (required)
             topic = message.topic
 
             # Generate slides using existing slide creator
