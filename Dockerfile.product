@@ -1,0 +1,36 @@
+# Product Worker Dockerfile - Heavy processing
+FROM python:3.12-slim
+
+WORKDIR /app
+
+# Install dependencies for video/audio processing
+RUN apt-get update && apt-get install -y \
+    gcc \
+    g++ \
+    ffmpeg \
+    libsm6 \
+    libxext6 \
+    libfontconfig1 \
+    libxrender1 \
+    libgl1-mesa-glx \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy and install Python dependencies (full set for video/audio processing)
+COPY requirements-product.txt .
+RUN pip install --no-cache-dir -r requirements-product.txt
+
+# Copy source code
+COPY src/ ./src/
+COPY product_worker.py .
+
+# Create credentials and temp directories
+RUN mkdir -p /app/credentials /tmp/video_temp
+
+# Environment setup
+ENV PYTHONPATH=/app
+ENV PYTHONUNBUFFERED=1
+ENV OMP_NUM_THREADS=2
+ENV OPENCV_LOG_LEVEL=ERROR
+
+# Run product worker
+CMD ["python", "product_worker.py"]

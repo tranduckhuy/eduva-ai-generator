@@ -1,0 +1,28 @@
+# Content Worker Dockerfile - Lightweight
+FROM python:3.12-slim
+
+WORKDIR /app
+
+# Install minimal dependencies for content generation
+RUN apt-get update && apt-get install -y \
+    gcc \
+    g++ \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy and install Python dependencies (lightweight for content only)
+COPY requirements-content.txt .
+RUN pip install --no-cache-dir -r requirements-content.txt
+
+# Copy source code
+COPY src/ ./src/
+COPY content_worker.py .
+
+# Create credentials directory
+RUN mkdir -p /app/credentials
+
+# Environment setup
+ENV PYTHONPATH=/app
+ENV PYTHONUNBUFFERED=1
+
+# Run content worker
+CMD ["python", "content_worker.py"]

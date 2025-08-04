@@ -400,18 +400,25 @@ class VideoGenerator:
                 output_path
             ]
             
-            # Chạy lệnh
-            process = await asyncio.create_subprocess_exec(
-                *cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE
-            )
-            stdout, stderr = await process.communicate()
-
-            if process.returncode != 0:
-                logger.error(f"FFmpeg failed with code {process.returncode}")
-                logger.error(f"FFmpeg stderr: {stderr.decode()}")
-                raise RuntimeError("FFmpeg concatenation failed")
+            # Run FFmpeg command
+            try:
+                process = await asyncio.create_subprocess_exec(
+                    *cmd,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE
+                )
+                stdout, stderr = await process.communicate()
+                
+                if process.returncode != 0:
+                    logger.error(f"FFmpeg failed: {stderr.decode()}")
+                    raise RuntimeError("FFmpeg concatenation failed")
+                    
+            except asyncio.CancelledError:
+                logger.info("FFmpeg cancelled, cleaning up...")
+                if 'process' in locals() and process.returncode is None:
+                    process.terminate()
+                    await asyncio.sleep(1)  # Give time to terminate
+                raise
 
             logger.info(f"Final video saved successfully: {output_path}")
             

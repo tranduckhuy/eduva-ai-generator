@@ -13,6 +13,7 @@ from src.models.task_messages import CreateProductMessage, JobType
 from src.services.video_generator import VideoGenerator
 from src.config.job_status import JobStatus
 from src.utils.logger import logger
+from src.utils.temp_cleanup import force_cleanup_workspace
 from src.services.tts_service import TTSService
 from src.services.tts_service import TTSService
 from moviepy.editor import concatenate_audioclips, AudioFileClip, VideoFileClip
@@ -84,6 +85,17 @@ class ProductCreationHandler(BaseTaskHandler):
             
             logger.info(f"Successfully completed product creation for job {job_id}")
             return True
+        
+        except asyncio.CancelledError:
+            logger.info(f"Product creation task cancelled for job {job_id}")
+            # Clean up any partial blob upload
+            if product_blob_name:
+                try:
+                    await self.delete_blob(self.config.azure_output_container, product_blob_name)
+                    logger.info(f"Cleaned up partial blob: {product_blob_name}")
+                except Exception as cleanup_error:
+                    logger.warning(f"Failed to cleanup blob during cancellation: {cleanup_error}")
+            return False
             
         except Exception as e:
             error_message = f"Product creation failed for job {job_id}: {str(e)}"
@@ -98,10 +110,8 @@ class ProductCreationHandler(BaseTaskHandler):
             return False
             
         finally:
-            # Clean up temporary files
-            if os.path.exists(workspace_dir):
-                shutil.rmtree(workspace_dir)
-                logger.info(f"Cleaned up main workspace: {workspace_dir}")
+            if 'workspace_dir' in locals():
+                force_cleanup_workspace(workspace_dir)
     
     async def _generate_product(
         self, 

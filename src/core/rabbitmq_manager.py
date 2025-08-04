@@ -16,6 +16,7 @@ class RabbitMQManager:
         self.message_handler = message_handler
         self.connection = None
         self.consuming_task = None
+        self.running_tasks = set()  # Track running message processing tasks
         logger.info(f"aio-pika RabbitMQ manager initialized for queue: {config.ai_task_queue}")
 
     async def start(self):
@@ -39,7 +40,7 @@ class RabbitMQManager:
         async with self.connection:
             channel = await self.connection.channel()
             await channel.set_qos(prefetch_count=self.config.prefetch_count or 1)
-            
+            print(f"Setting prefetch count to {self.config.prefetch_count}")
             dlq_exchange = await channel.declare_exchange(self.config.dlq_exchange, aio_pika.ExchangeType.DIRECT, durable=True)
             dlq_queue = await channel.declare_queue(self.config.dlq_queue, durable=True)
             await dlq_queue.bind(dlq_exchange, self.config.dlq_routing_key)
@@ -57,7 +58,11 @@ class RabbitMQManager:
             logger.info("Consumer is waiting for messages.")
             async with queue.iterator() as queue_iter:
                 async for message in queue_iter:
-                    asyncio.create_task(self._process_message_safely(message))
+                    # Create task and track it
+                    task = asyncio.create_task(self._process_message_safely(message))
+                    self.running_tasks.add(task)
+                    # Remove task when done
+                    task.add_done_callback(lambda t: self.running_tasks.discard(t))
     
     async def _process_message_safely(self, message: aio_pika.IncomingMessage):
         """
@@ -83,6 +88,11 @@ class RabbitMQManager:
                     await self._retry_message(message, retry_count + 1)
                 else:
                     logger.info(f"✅ Message {job_id} processed successfully.")
+        
+        except asyncio.CancelledError:
+            logger.info(f"Task for job {job_id} was cancelled during shutdown")
+            # Don't re-raise CancelledError - let it be handled gracefully
+            return
             
         except Exception as e:
             logger.error(f"🔥 Unhandled exception for job {job_id}: {e}. Message will be rejected.", exc_info=True)
@@ -103,6 +113,8 @@ class RabbitMQManager:
     async def stop(self):
         """Stops the RabbitMQ consumer gracefully."""
         logger.info("Stopping RabbitMQ consumer...")
+        
+        # Cancel consuming task first
         if self.consuming_task:
             self.consuming_task.cancel()
             try:
@@ -110,6 +122,20 @@ class RabbitMQManager:
             except asyncio.CancelledError:
                 logger.info("Consuming task cancelled.")
         
+        # Cancel running tasks with simple timeout
+        if self.running_tasks:
+            logger.info(f"Cancelling {len(self.running_tasks)} running tasks...")
+            for task in list(self.running_tasks):
+                task.cancel()
+            
+            # Simple wait with timeout
+            try:
+                await asyncio.wait_for(asyncio.sleep(3), timeout=5.0)
+            except asyncio.TimeoutError:
+                pass
+            logger.info("Running tasks cancelled.")
+        
+        # Close connection
         if self.connection and not self.connection.is_closed:
             await self.connection.close()
         logger.info("RabbitMQ connection closed.")

@@ -16,3 +16,4 @@ audio_files
 **/temp_videos/**
 *.local.*
 credentials/
+.env.*

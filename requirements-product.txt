@@ -1,0 +1,35 @@
+# Product Worker Dependencies - Full set for video/audio processing
+python-dotenv
+loguru
+aiohttp
+aio-pika
+azure-storage-blob
+azure-identity
+requests
+
+# AI and Language Processing
+langchain
+langchain-community
+langchain-google-genai
+langchain-text-splitters
+google-cloud-aiplatform
+
+# Document Processing (inherited from content functionality)
+PyMuPDF
+python-docx
+docx2txt
+unstructured
+
+# Backend Communication
+PyJWT==2.8.0
+python_jose==3.3.0
+
+# Video/Audio Processing (HEAVY - product worker only)
+moviepy==1.0.3
+google-cloud-texttospeech
+Pillow
+numpy
+vertexai
+
+# Basic utilities
+pydantic

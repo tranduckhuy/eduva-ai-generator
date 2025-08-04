@@ -1,0 +1,28 @@
+# Content Worker Requirements - Only essentials for content generation
+python-dotenv
+loguru
+aiohttp
+aio-pika
+azure-storage-blob
+azure-identity
+requests
+
+# AI and Language Processing (for content generation only)
+langchain
+langchain-community
+langchain-google-genai
+langchain-text-splitters
+google-cloud-aiplatform
+
+# Document Processing (for content input files)
+PyMuPDF
+python-docx
+docx2txt
+unstructured
+
+# Backend Communication
+PyJWT==2.8.0
+python_jose==3.3.0
+
+# Basic utilities
+pydantic

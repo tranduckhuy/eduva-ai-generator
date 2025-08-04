@@ -5,10 +5,10 @@ from dataclasses import dataclass
 from typing import Dict, Any, Optional, List
 from enum import Enum
 
-class TaskType(str, Enum):
+class TaskType(Enum):
     """Types of tasks that can be processed"""
-    GENERATE_CONTENT = "generate_content"
-    CREATE_PRODUCT = "create_product"
+    GENERATE_CONTENT = 0
+    CREATE_PRODUCT = 1
 
 
 class JobType(Enum):
@@ -21,11 +21,11 @@ class JobType(Enum):
 class TaskMessage:
     """Base task message structure"""
     jobId: str
-    taskType: str
+    taskType: TaskType  # Changed from str to TaskType enum
     
     def __post_init__(self):
         """Validate task message"""
-        if self.taskType not in [TaskType.GENERATE_CONTENT, TaskType.CREATE_PRODUCT]:
+        if not isinstance(self.taskType, TaskType):
             raise ValueError(f"Invalid taskType: {self.taskType}")
 
 
@@ -79,14 +79,33 @@ def parse_task_message(message_body: Dict[str, Any]) -> TaskMessage:
     Raises:
         ValueError: If message format is invalid
     """
-    task_type = message_body.get("taskType")
+    task_type_value = message_body.get("taskType")
     
-    if not task_type:
+    if task_type_value is None:
         raise ValueError("Missing 'taskType' in message")
+    
+    # Convert taskType to enum - handle both int and string
+    if isinstance(task_type_value, int):
+        try:
+            task_type = TaskType(task_type_value)
+        except ValueError:
+            raise ValueError(f"Invalid taskType: {task_type_value}")
+    elif isinstance(task_type_value, str):
+        try:
+            # Try to parse as int first
+            task_type = TaskType(int(task_type_value))
+        except ValueError:
+            # Try as enum name
+            try:
+                task_type = TaskType[task_type_value.upper()]
+            except KeyError:
+                raise ValueError(f"Invalid taskType: {task_type_value}")
+    else:
+        raise ValueError(f"Invalid taskType type: {type(task_type_value)}")
     
     if task_type == TaskType.GENERATE_CONTENT:
         return GenerateContentMessage(
-            taskType=message_body["taskType"],
+            taskType=task_type,
             jobId=message_body["jobId"],
             topic=message_body["topic"],
             sourceBlobNames=message_body["sourceBlobNames"]
@@ -120,7 +139,7 @@ def parse_task_message(message_body: Dict[str, Any]) -> TaskMessage:
             raise ValueError(f"Invalid jobType: {job_type_value}")
         
         return CreateProductMessage(
-            taskType=message_body["taskType"],
+            taskType=task_type,
             jobId=message_body["jobId"],
             jobType=job_type,
             contentBlobName=message_body["contentBlobName"],
@@ -129,25 +148,3 @@ def parse_task_message(message_body: Dict[str, Any]) -> TaskMessage:
     
     else:
         raise ValueError(f"Unknown taskType: {task_type}")
-
-
-# Example message structures for documentation
-
-EXAMPLE_GENERATE_CONTENT_MESSAGE = {
-    "taskType": "generate_content",
-    "jobId": "12345",
-    "topic": "Introduction to Python",
-    "sourceBlobNames": ["source_document.pdf", "additional_notes.docx"]
-}
-
-EXAMPLE_CREATE_PRODUCT_MESSAGE = {
-    "taskType": "create_product",
-    "jobId": "12345",
-    "jobType": 1,  # 0 for audio, 1 for video (matches C# AIServiceType enum)
-    "contentBlobName": "lesson_content.json",
-    "voiceConfig": {
-        "languageCode": "vi-VN",
-        "name": "vi-VN-Neural2-A",
-        "speakingRate": 1.0
-    }
-}

@@ -16,13 +16,13 @@ class WorkerConfig:
     # RabbitMQ Configuration  
     rabbitmq_uri: str = os.getenv("RABBITMQ_URI", "amqp://eduva:eduva2025@localhost:56791")
     
-    # Queue Configuration
-    ai_task_queue: str = os.getenv("AI_TASK_QUEUE", "eduva_ai_tasks_queue")
-    main_exchange: str = os.getenv("MAIN_EXCHANGE", "eduva_exchange")
-    routing_key: str = os.getenv("ROUTING_KEY", "eduva_routing_key")
-    dlq_queue: str = os.getenv("DLQ_QUEUE", "eduva_ai_tasks_dlq_queue")
-    dlq_exchange: str = os.getenv("DLQ_EXCHANGE", "eduva_ai_task_dlq")
-    dlq_routing_key: str = os.getenv("DLQ_ROUTING_KEY", "eduva_dlq_routing_key")
+    # Queue Configuration - Simple setup
+    ai_task_queue: str = os.getenv("QUEUE_NAME", "ai_queue")
+    main_exchange: str = os.getenv("EXCHANGE_NAME", "ai_exchange")
+    routing_key: str = os.getenv("ROUTING_KEY", "ai.task")
+    dlq_queue: str = os.getenv("DLQ_QUEUE", "eduva.dlq")
+    dlq_exchange: str = os.getenv("DLQ_EXCHANGE", "eduva.dlq.exchange")
+    dlq_routing_key: str = os.getenv("DLQ_ROUTING_KEY", "eduva.dlq.routing_key")
     
     # Azure Blob Storage Configuration
     azure_storage_connection_string: str = os.getenv("AZURE_STORAGE_CONNECTION_STRING", "")
@@ -34,7 +34,6 @@ class WorkerConfig:
     google_application_credentials: str = os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "")
     default_model: str = os.getenv("DEFAULT_MODEL", "gemini-2.5-flash-lite-preview-06-17")
     unsplash_access_key: str = os.getenv("UNSPLASH_ACCESS_KEY", "")
-    pexels_access_key: str = os.getenv("PEXELS_ACCESS_KEY", "")
     
     # Backend API Configuration
     backend_api_base_url: str = os.getenv("BACKEND_API_BASE_URL", "https://localhost:9001")
@@ -62,15 +61,11 @@ class WorkerConfig:
         if not self.backend_api_base_url:
             raise ValueError("BACKEND_API_BASE_URL is required")
         
-        if not self.google_api_key:
-            raise ValueError("GOOGLE_API_KEY is required")
+        if not self.backend_api_key:
+            raise ValueError("BACKEND_API_KEY is required")
         
-        if not self.google_application_credentials:
-            raise ValueError("GOOGLE_APPLICATION_CREDENTIALS is required")
-        
-        # Validate that Google credentials file exists
-        if not os.path.exists(self.google_application_credentials):
-            raise ValueError(f"Google credentials file not found: {self.google_application_credentials}")
+        if not self.worker_id:
+            raise ValueError("WORKER_ID is required")
         
         # Ensure temp directory exists
         os.makedirs(self.temp_dir, exist_ok=True)
@@ -79,3 +74,17 @@ class WorkerConfig:
     def is_backend_api_enabled(self) -> bool:
         """Check if backend API is properly configured"""
         return bool(self.backend_api_key and self.backend_api_base_url)
+    
+    def validate_for_product_worker(self):
+        """Additional validation for product worker (TTS, video processing)"""
+        if not self.google_application_credentials:
+            raise ValueError("GOOGLE_APPLICATION_CREDENTIALS is required for product worker")
+        
+        # Validate that Google credentials file exists
+        if not os.path.exists(self.google_application_credentials):
+            raise ValueError(f"Google credentials file not found: {self.google_application_credentials}")
+    
+    def validate_for_content_worker(self):
+        # Validate google API key for content worker
+        if not self.google_api_key:
+            raise ValueError("GOOGLE_API_KEY is required for content worker")

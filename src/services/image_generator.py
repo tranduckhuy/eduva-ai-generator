@@ -14,7 +14,7 @@ from vertexai.preview.vision_models import ImageGenerationModel
 logger = logging.getLogger(__name__)
 PROJECT_ID = os.getenv("GOOGLE_CLOUD_PROJECT")
 LOCATION = os.getenv("GOOGLE_CLOUD_LOCATION", "us-central1")
-IMAGE_GENERATION_MODEL = os.getenv("IMAGE_GENERATION_MODEL", "imagen-4.0-fast-generate-preview-06-06")
+IMAGE_GENERATION_MODEL = os.getenv("IMAGE_GENERATION_MODEL", "imagen-3.0-generate-001")
 
 class ImageGenerator:
     def __init__(self, unsplash_access_key: str = None, template_name: str = 'modern_blue'):

@@ -43,7 +43,6 @@ docker-compose up --build -d
 - `WORKER_ID` - Worker identifier (default: auto-generated)
 - `MAX_CONCURRENT_TASKS` - Max concurrent tasks (default: 2)
 - `UNSPLASH_ACCESS_KEY` - For image generation
-- `PEXELS_ACCESS_KEY` - For video backgrounds
 
 ## 📨 Task Types
 

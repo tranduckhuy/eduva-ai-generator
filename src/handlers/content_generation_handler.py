@@ -99,6 +99,17 @@ class ContentGenerationHandler(BaseTaskHandler):
             
             logger.info(f"Successfully completed content generation for job {job_id}")
             return True
+        
+        except asyncio.CancelledError:
+            logger.info(f"Content generation task cancelled for job {job_id}")
+            # Clean up any partial blob upload
+            if content_blob_name:
+                try:
+                    await self.delete_blob(self.config.azure_input_container, content_blob_name)
+                    logger.info(f"Cleaned up partial blob: {content_blob_name}")
+                except Exception as cleanup_error:
+                    logger.warning(f"Failed to cleanup blob during cancellation: {cleanup_error}")
+            return False
             
         except Exception as e:
             error_message = f"Content generation failed for job {job_id}: {str(e)}"
