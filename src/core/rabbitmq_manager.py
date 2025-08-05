@@ -22,7 +22,6 @@ class RabbitMQManager:
     async def start(self):
         """Connects to RabbitMQ and starts the message consuming task."""
         try:
-            logger.info(f"Connecting to RabbitMQ: {self.config.rabbitmq_uri}")
             self.connection = await aio_pika.connect_robust(
                 self.config.rabbitmq_uri, 
                 timeout=30

@@ -2,7 +2,7 @@
 Content Worker Task Dispatcher - Only handles content generation
 """
 from typing import Dict
-from src.models.task_messages import TaskMessage, TaskType, parse_task_message
+from src.models.task_messages import TaskType, parse_task_message
 from src.handlers.base_handler import BaseTaskHandler
 from src.utils.logger import logger
 

@@ -6,7 +6,7 @@ import uuid
 import platform
 from typing import List, Dict, Any
 from concurrent.futures import ThreadPoolExecutor
-from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips, VideoFileClip, concatenate_audioclips
+from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips, concatenate_audioclips
 from moviepy.audio.AudioClip import AudioArrayClip
 from moviepy.audio.fx.audio_fadeout import audio_fadeout
 import numpy as np
@@ -28,11 +28,11 @@ class VideoGenerator:
         
         # Platform-specific settings - OPTIMIZED
         self.is_windows = platform.system() == "Windows"
-        self.cleanup_delay = 0.5 if self.is_windows else 0.1  # Reduced cleanup delay
+        self.cleanup_delay = 0.5 if self.is_windows else 0.1
         
         # Performance optimizations
-        self.max_workers_optimized = min(3, os.cpu_count())  # Increased concurrency
-        self.batch_size_optimized = 3  # Larger batches
+        self.max_workers_optimized = min(3, os.cpu_count())
+        self.batch_size_optimized = 3
         self.video_fps = 15  # Lower FPS for faster processing
         self.image_resolution = (1280, 720)  # Standard HD
         
@@ -92,7 +92,7 @@ class VideoGenerator:
             if not slides:
                 raise ValueError("No slides found in lesson data")
             
-            logger.info(f"Using provided temporary directory: {temp_dir}")
+            self.slide_processor.reset_for_new_video()
             
             # Process all slides concurrently with reduced concurrency
             slide_video_paths = await self._process_slides_concurrent(slides, temp_dir)
@@ -173,7 +173,6 @@ class VideoGenerator:
 
         try:
             slide_id = slide.get('slide_id', slide_index + 1)
-            logger.info(f"Processing slide {slide_id}...")
             
             audio_path = os.path.join(slide_temp_dir, f"audio_{slide_id}_{uuid.uuid4().hex[:8]}.mp3")
             video_path = os.path.join(slide_temp_dir, f"slide_{slide_id}_{uuid.uuid4().hex[:8]}.mp4")
@@ -201,8 +200,11 @@ class VideoGenerator:
             gc.collect()
             
             # Process slide images using the optimized approach
+            # Add disclaimer for first slide (slide_id = 1, not slide_index)
+            is_first_slide = (slide_id == 1)
+            
             slide_result = self.slide_processor.process_slide_images(
-                slide, slide_temp_dir, slide_id, self.image_resolution
+                slide, slide_temp_dir, slide_id, self.image_resolution, add_disclaimer=is_first_slide
             )
             
             # Calculate optimal timing for images based on audio duration
@@ -221,7 +223,6 @@ class VideoGenerator:
             if not os.path.exists(video_path):
                 raise FileNotFoundError(f"Video file was not created: {video_path}")
             
-            logger.info(f"Slide {slide_id} processed successfully: {video_path}")
             return video_path
             
         except Exception as e:
@@ -239,9 +240,6 @@ class VideoGenerator:
             # Add silence at the end if requested
             if silence_duration > 0:
                 try:
-                    # Create silence audio in memory - thread-safe and efficient
-                    # This avoids concurrent access issues completely
-                    
                     # Load original audio
                     audio = AudioFileClip(path)
                     audio = audio_fadeout(audio, 0.02)
@@ -343,21 +341,19 @@ class VideoGenerator:
                 # Combine with audio
                 final_clip = video_clip.set_audio(audio_clip)
                 clips.append(final_clip)
-
-                logger.info(f"Creating video with {len(image_clips)} images, total duration: {total_duration:.2f}s")
                 
                 # Write video file with enhanced error handling - OPTIMIZED
                 try:
                     self._safe_file_operation(
                         final_clip.write_videofile,
                         output_path,
-                        fps=self.video_fps,  # OPTIMIZED: Lower FPS
+                        fps=self.video_fps,
                         codec='libx264',
                         audio_codec='aac',
                         verbose=False,
                         logger=None,
-                        preset='ultrafast',  # OPTIMIZED: Fastest encoding
-                        ffmpeg_params=['-crf', '28'],  # OPTIMIZED: Higher compression for speed
+                        preset='ultrafast',
+                        ffmpeg_params=['-crf', '28'],
                         temp_audiofile=None
                     )
                 except Exception as e:

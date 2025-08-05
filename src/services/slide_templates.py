@@ -1,7 +1,7 @@
 """
 Slide Templates for beautiful video generation
 """
-from typing import Dict, Any, List
+from typing import Dict, List, Any
 from PIL import Image, ImageDraw, ImageFont
 import os
 import random
@@ -568,17 +568,27 @@ class ModernQuestionSlideTemplate(SlideTemplate):
         return output_path
 
 class ElegantCardTemplate(SlideTemplate):
-    """Modern elegant slide with card-style layout and professional color palette"""
+    """
+    A slide template with a "Modern Natural" theme.
+    It uses a warm, harmonious palette with the original layout spacing
+    to maximize content area.
+    """
 
     def create(self, title: str, contents: List[str], output_path: str, size: tuple = (1280, 720)) -> str:
-        img = Image.new('RGB', size, color='#334155') # Light warm gray background
+        BG_COLOR = '#FDF8F5'
+        CARD_COLOR = '#FFFFFF'
+        TEXT_PRIMARY_COLOR = '#4A4A4A'
+        TEXT_SECONDARY_COLOR = '#6E6E6E'
+        ACCENT_COLOR = '#E87A5D'
+        SHADOW_COLOR = '#D1C7C2'
+
+        img = Image.new('RGB', size, color=BG_COLOR)
         draw = ImageDraw.Draw(img)
 
         width, height = size
         margin_x = 80
         title_font, content_font = self.get_fonts(40, 26)
 
-        # === HEADER TITLE ===
         if len(title) > 80:
             title = title[:77] + "..."
         title_y = 50
@@ -586,14 +596,12 @@ class ElegantCardTemplate(SlideTemplate):
         for line in title_lines[:2]:
             bbox = draw.textbbox((0, 0), line, font=title_font)
             x = (width - (bbox[2] - bbox[0])) // 2
-            draw.text((x, title_y), line, font=title_font, fill='#111827')
+            draw.text((x, title_y), line, font=title_font, fill=TEXT_PRIMARY_COLOR)
             title_y += 50
 
-        # === SEPARATOR LINE ===
         separator_y = title_y + 10
-        draw.line([margin_x, separator_y, width - margin_x, separator_y], fill='#047857', width=4)
+        draw.line([margin_x, separator_y, width - margin_x, separator_y], fill=ACCENT_COLOR, width=4)
 
-        # === CONTENT CARD ===
         card_margin_top = separator_y + 30
         card_padding = 40
         card_x1 = margin_x
@@ -601,24 +609,20 @@ class ElegantCardTemplate(SlideTemplate):
         card_y1 = card_margin_top
         card_y2 = height - 60
 
-        # Shadow card (fake shadow with slightly offset gray box)
         shadow_offset = 6
         draw.rounded_rectangle(
             [card_x1 + shadow_offset, card_y1 + shadow_offset, card_x2 + shadow_offset, card_y2 + shadow_offset],
             radius=20,
-            fill='#d1d5db'  # Gray shadow
+            fill=SHADOW_COLOR
         )
-        # Main white card
-        draw.rounded_rectangle([card_x1, card_y1, card_x2, card_y2], radius=20, fill='white')
+        draw.rounded_rectangle([card_x1, card_y1, card_x2, card_y2], radius=20, fill=CARD_COLOR)
 
-        # === DRAW CONTENT ===
         content_x = card_x1 + card_padding
         content_y = card_y1 + card_padding
         max_text_width = card_x2 - card_x1 - 2 * card_padding
         line_spacing = 40
         bullet_radius = 5
 
-        # Auto spacing shrink if content too long
         total_lines = sum(len(self.wrap_text(draw, item, content_font, max_text_width)) for item in contents)
         available_height = card_y2 - content_y - 30
         estimated_height = total_lines * line_spacing
@@ -630,12 +634,12 @@ class ElegantCardTemplate(SlideTemplate):
             for i, line in enumerate(lines):
                 if content_y > card_y2 - 30:
                     break
-                # Bullet
                 if i == 0:
                     bx = content_x - 20
                     by = content_y + 10
-                    draw.ellipse([bx, by, bx + bullet_radius*2, by + bullet_radius*2], fill='#047857')
-                draw.text((content_x, content_y), line, font=content_font, fill='#374151')
+                    draw.ellipse([bx, by, bx + bullet_radius * 2, by + bullet_radius * 2], fill=ACCENT_COLOR)
+                
+                draw.text((content_x, content_y), line, font=content_font, fill=TEXT_SECONDARY_COLOR)
                 content_y += line_spacing
             content_y += 10
 
@@ -741,6 +745,30 @@ class FocusBlockEducationTemplate(SlideTemplate):
 class SlideTemplateManager:
     """Manager for slide templates with smart selection"""
     
+    # Template mapping để giảm repetition
+    TEMPLATE_DESCRIPTIONS = {
+        'modern_blue': 'Modern Blue - Professional blue gradient with clean typography',
+        'minimal_green': 'Minimal Green - Clean white background with green accents',
+        'dark_mode': 'Dark Mode - Modern dark theme with purple accents',
+        'creative_orange': 'Creative Orange - Vibrant orange with creative shapes',
+        'clean_white': 'Clean White - Professional white with subtle accents',
+        'blue_accent': 'Blue Accent - Navy background with blue accents',
+        'geometric_accent': 'Geometric Accent - Strong geometric shapes with bold colors',
+        'nature_green': 'Nature Green - Earthy tones with organic shapes',
+        'modern_question_slide': 'Modern Question Slide - Interactive question slide with icons',
+        'elegant_card': 'Elegant Card - Modern card-style layout with elegant design',
+        'modern_edu': 'Modern Education - Clean education slide with blue header',
+        'soft_modern_edu': 'Soft Modern Education - Soft modern design with gentle colors',
+    }
+    
+    # Content-based template recommendations
+    CONTENT_TYPE_TEMPLATES = {
+        "question": ["modern_question_slide", "elegant_card", "clean_white"],
+        "summary": ["modern_edu", "blue_accent", "minimal_green"],
+        "introduction": ["creative_orange", "geometric_accent", "nature_green"],
+        "conclusion": ["dark_mode", "soft_modern_edu", "elegant_card"],
+    }
+    
     def __init__(self):
         self.templates = {
             'modern_blue': ModernBlueTemplate(),
@@ -756,101 +784,189 @@ class SlideTemplateManager:
             'modern_edu': ModernEduTemplate(),
             'soft_modern_edu': FocusBlockEducationTemplate(),
         }
-        self.current_template = 'modern_blue'
+        self._reset_state()
+        logger.info(f"SlideTemplateManager initialized with template: {self.current_template}")
+    
+    def _reset_state(self):
+        """Reset internal state"""
+        self.current_template = random.choice(list(self.templates.keys()))
         self.user_choice_template = None
         self.slide_counter = 0
     
-    def set_template(self, template_name: str):
-        """Set the current template"""
-        if template_name in self.templates:
-            self.current_template = template_name
-            logger.info(f"Template set to: {template_name}")
-        else:
-            logger.warning(f"Template '{template_name}' not found. Available: {list(self.templates.keys())}")
+    def _get_random_template(self, exclude_current: bool = True) -> str:
+        """Get random template with optional exclusion of current"""
+        available = list(self.templates.keys())
+        if exclude_current and len(available) > 1:
+            available = [t for t in available if t != self.current_template]
+        return random.choice(available)
     
-    def set_user_choice_template(self, template_name: str):
-        """Set user choice template for first slide"""
-        if template_name in self.templates:
-            self.user_choice_template = template_name
-            self.current_template = template_name
-            self.slide_counter = 0
-            logger.info(f"User choice template set to: {template_name}")
-        else:
+    def set_template(self, template_name: str) -> bool:
+        """Set template with validation"""
+        if template_name not in self.templates:
             logger.warning(f"Template '{template_name}' not found. Available: {list(self.templates.keys())}")
+            return False
+        
+        self.current_template = template_name
+        logger.info(f"Template set to: {template_name}")
+        return True
     
-    def auto_select_template(self):
-        """Auto select template: first slide = user choice (or default), others = random"""
-        if self.slide_counter == 0:
-            # Slide đầu tiên: dùng user choice hoặc mặc định
-            if self.user_choice_template:
-                self.current_template = self.user_choice_template
-                logger.info(f"First slide using user choice: {self.current_template}")
-            else:
-                logger.info(f"First slide using default: {self.current_template}")
+    def set_user_preference(self, template_name: str) -> bool:
+        """Set user preference for first slide"""
+        if not self.set_template(template_name):
+            return False
+        
+        self.user_choice_template = template_name
+        self.slide_counter = 0
+        logger.info(f"User preference set: {template_name}")
+        return True
+    
+    def select_next_template(self, content_type: str = "normal") -> str:
+        """Smart template selection for next slide"""
+        is_first_slide = self.slide_counter == 0
+        
+        if is_first_slide and self.user_choice_template:
+            self.current_template = self.user_choice_template
+            logger.info(f"First slide using user preference: {self.current_template}")
         else:
-            # Các slide sau: chọn random (khác template hiện tại)
-            available = [t for t in self.templates.keys() if t != self.current_template]
-            if available:
+            # Smart selection based on content type
+            suitable_templates = self.CONTENT_TYPE_TEMPLATES.get(
+                content_type, list(self.templates.keys())
+            )
+            
+            # Avoid repetition unless it's the first slide
+            if not is_first_slide and self.current_template in suitable_templates:
+                suitable_templates = [t for t in suitable_templates if t != self.current_template]
+            
+            if suitable_templates:
                 old_template = self.current_template
-                self.current_template = random.choice(available)
-                logger.info(f"Slide {self.slide_counter + 1}: {old_template} → {self.current_template}")
+                self.current_template = random.choice(suitable_templates)
+                logger.info(f"Slide {self.slide_counter + 1} ({content_type}): {old_template} → {self.current_template}")
         
         self.slide_counter += 1
         return self.current_template
     
-    def reset_slide_counter(self):
-        """Reset counter when starting new video"""
-        self.slide_counter = 0
-        logger.info("Slide counter reset")
-    
-    def create_content_image(self, title: str, contents: List[str], output_path: str, size: tuple = (1280, 720), auto_select: bool = False) -> str:
-        """Create content image using current template"""
-        if auto_select:
-            self.auto_select_template()
+    def create_slide_image(self, title: str, contents: List[str], output_path: str, 
+                          size: tuple = (1280, 720), content_type: str = "normal", 
+                          add_disclaimer: bool = False, slide_id: int = None) -> str:
+        """Main method to create slide image with smart template selection"""
         
+        # For concurrent processing, use slide_id to determine if this is first slide
+        # instead of relying on slide_counter which can have race conditions
+        is_first_slide = (slide_id == 1) if slide_id is not None else (self.slide_counter == 0)
+        
+        # Auto-select template based on content type
+        self.select_next_template(content_type)
+        
+        # Create image
         template = self.templates[self.current_template]
-        return template.create(title, contents, output_path, size)
-    
-    def create_content_image_with_template(self, template_name: str, title: str, contents: List[str], output_path: str, size: tuple = (1280, 720)) -> str:
-        """Create content image with specific template"""
-        if template_name not in self.templates:
-            logger.warning(f"Template '{template_name}' not found, using current template")
-            template_name = self.current_template
+        result_path = template.create(title, contents, output_path, size)
         
-        template = self.templates[template_name]
-        return template.create(title, contents, output_path, size)
+        # Add disclaimer for first slide - use slide_id for thread safety
+        if add_disclaimer and is_first_slide:
+            logger.info(f"Adding disclaimer to slide {slide_id or 'first'}...")
+            result_path = self._add_disclaimer(result_path, size)
+        
+        return result_path
+    
+    def _add_disclaimer(self, image_path: str, size: tuple) -> str:
+        """Add disclaimer to slide image"""
+        try:
+            img = Image.open(image_path)
+            draw = ImageDraw.Draw(img)
+            
+            # Get font with better fallback
+            font_size = 18
+            try:
+                if os.name == 'nt':  # Windows
+                    # Try different Windows fonts
+                    for font_name in ["arial.ttf", "calibri.ttf", "segoeui.ttf"]:
+                        try:
+                            font = ImageFont.truetype(font_name, font_size)
+                            break
+                        except:
+                            continue
+                    else:
+                        font = ImageFont.load_default()
+                else:
+                    # Linux/Mac fonts
+                    font_paths = [
+                        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+                        "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+                        "/System/Library/Fonts/Arial.ttf"
+                    ]
+                    font = ImageFont.load_default()
+                    for font_path in font_paths:
+                        if os.path.exists(font_path):
+                            font = ImageFont.truetype(font_path, font_size)
+                            break
+            except Exception as font_error:
+                logger.warning(f"Font loading failed: {font_error}")
+                font = ImageFont.load_default()
+            
+            disclaimer_text = "Hình ảnh trong video mang tính minh họa"
+            
+            # Calculate position (bottom-right with more margin)
+            bbox = draw.textbbox((0, 0), disclaimer_text, font=font)
+            text_width, text_height = bbox[2] - bbox[0], bbox[3] - bbox[1]
+            margin_x = 25
+            margin_y = 20
+            x = size[0] - text_width - margin_x
+            y = size[1] - text_height - margin_y
+            
+            # Create contrasting background - darker for better text visibility
+            padding = 10
+            bg_x1 = x - padding
+            bg_y1 = y - padding
+            bg_x2 = x + text_width + padding
+            bg_y2 = y + text_height + padding
+            
+            # Semi-transparent dark background for better contrast
+            overlay = Image.new('RGBA', size, (0, 0, 0, 0))
+            overlay_draw = ImageDraw.Draw(overlay)
+            overlay_draw.rounded_rectangle(
+                [bg_x1, bg_y1, bg_x2, bg_y2],
+                radius=6, 
+                fill=(0, 0, 0, 180)
+            )
+            
+            # Composite overlay onto image
+            img = Image.alpha_composite(img.convert('RGBA'), overlay).convert('RGB')
+            draw = ImageDraw.Draw(img)
+            
+            # Draw text in bright white for maximum contrast
+            draw.text((x, y), disclaimer_text, font=font, fill='white')
+            
+            # Save with high quality
+            img.save(image_path, 'JPEG', quality=95, optimize=True)
+            img.close()
+            
+            logger.info(f"✅ Added disclaimer to slide: '{disclaimer_text}'")
+            return image_path
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to add disclaimer: {e}", exc_info=True)
+            return image_path
+        
+        return image_path
+    
+    def reset_for_new_video(self):
+        """Reset state for new video generation"""
+        user_pref = self.user_choice_template
+        self._reset_state()
+        if user_pref:
+            self.user_choice_template = user_pref
+            self.current_template = user_pref
+        logger.info("Template manager reset for new video")
     
     def get_available_templates(self) -> Dict[str, str]:
-        """Get list of available templates with descriptions"""
-        return {
-            'modern_blue': 'Modern Blue - Professional blue gradient with clean typography',
-            'minimal_green': 'Minimal Green - Clean white background with green accents',
-            'dark_mode': 'Dark Mode - Modern dark theme with purple accents',
-            'creative_orange': 'Creative Orange - Vibrant orange with creative shapes',
-            'clean_white': 'Clean White - Professional white with subtle accents',
-            'blue_accent': 'Blue Accent - Navy background with blue accents',
-            'geometric_accent': 'Geometric Accent - Strong geometric shapes with bold colors',
-            'nature_green': 'Nature Green - Earthy tones with organic shapes',
-            'modern_question_slide': 'Modern Question Slide - Interactive question slide with icons',
-            'elegant_card': 'Elegant Card - Modern card-style layout with elegant design',
-            'modern_edu': 'Modern Education - Clean education slide with blue header',
-            'soft_modern_edu': 'Soft Modern Education - Soft modern design with gentle colors',
-        }
+        """Get available templates with descriptions"""
+        return self.TEMPLATE_DESCRIPTIONS.copy()
     
-    def cycle_template(self):
-        """Manually cycle to next template (for testing/preview)"""
-        template_names = list(self.templates.keys())
-        current_index = template_names.index(self.current_template)
-        next_index = (current_index + 1) % len(template_names)
-        self.current_template = template_names[next_index]
-        logger.info(f"Template manually cycled to: {self.current_template}")
-        return self.current_template
-    
-    def get_template_info(self):
-        """Get current template status"""
+    def get_status(self) -> Dict[str, Any]:
+        """Get current manager status"""
         return {
             'current_template': self.current_template,
-            'user_choice_template': self.user_choice_template,
-            'slide_counter': self.slide_counter,
+            'user_preference': self.user_choice_template,
+            'slide_count': self.slide_counter,
             'total_templates': len(self.templates)
         }

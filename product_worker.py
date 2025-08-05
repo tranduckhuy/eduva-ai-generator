@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 import ssl
 import aiohttp
 
-load_dotenv(dotenv_path=".env.product")
+load_dotenv(dotenv_path=".env.product.local")
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 
 from config.worker_config import WorkerConfig

@@ -1,14 +1,11 @@
 """
 Backend API client for communicating with C# backend
 """
-import asyncio
-import json
 import ssl
 from typing import Dict, Any, Optional
 import aiohttp
 from src.utils.logger import logger
 from src.config.job_status import JobStatus
-
 
 class BackendApiClient:
     """Client for communicating with the C# backend API"""
@@ -49,16 +46,6 @@ class BackendApiClient:
             self.session = aiohttp.ClientSession(connector=connector)
     
     async def update_job_status(self, job_id: str, status_data: Dict[str, Any]) -> bool:
-        """
-        Update job status via PUT request to /api/ai-jobs/{id}/progress
-        
-        Args:
-            job_id: ID of the job to update
-            status_data: Status data to send
-            
-        Returns:
-            bool: True if successful, False otherwise
-        """
         url = f"{self.base_url}/api/ai-jobs/{job_id}/progress"
         
         try:
@@ -71,7 +58,6 @@ class BackendApiClient:
             ) as response:
                 
                 if response.status == 200:
-                    logger.info(f"Successfully updated job {job_id} progress")
                     return True
                 else:
                     error_text = await response.text()
@@ -83,20 +69,8 @@ class BackendApiClient:
             return False
     
     async def update_job_success(self, job_id: str, status: JobStatus, **kwargs) -> bool:
-        """
-        Update job with success status
-        
-        Args:
-            job_id: ID of the job to update
-            status: JobStatus enum value
-            **kwargs: Additional data (e.g., wordCount, contentBlobName, productBlobName)
-            
-        Returns:
-            bool: True if successful, False otherwise
-        """
-        # Map to backend API structure  
         status_data = {
-            "jobStatus": status.value,  # Send enum value (number)
+            "jobStatus": status.value,
             "wordCount": kwargs.get("wordCount"),
             "previewContent": kwargs.get("previewContent"),
             "contentBlobName": kwargs.get("contentBlobName"),
@@ -112,20 +86,8 @@ class BackendApiClient:
         return await self.update_job_status(job_id, status_data)
     
     async def update_job_failure(self, job_id: str, failure_reason: str) -> bool:
-        """
-        Update job with failure status
-        
-        Args:
-            job_id: ID of the job to update
-            failure_reason: Detailed error message
-            
-        Returns:
-            bool: True if successful, False otherwise
-        """
-        from src.config.job_status import JobStatus
-        
         status_data = {
-            "jobStatus": JobStatus.Failed.value,  # Send enum value (number)
+            "jobStatus": JobStatus.Failed.value,
             "failureReason": failure_reason
         }
         
@@ -133,15 +95,6 @@ class BackendApiClient:
         return await self.update_job_status(job_id, status_data)
     
     async def get_job_details(self, job_id: str) -> Optional[Dict[str, Any]]:
-        """
-        Get job details from backend
-        
-        Args:
-            job_id: ID of the job
-            
-        Returns:
-            Dict containing job details or None if failed
-        """
         url = f"{self.base_url}/api/ai-jobs/{job_id}"
         
         try:
@@ -164,17 +117,6 @@ class BackendApiClient:
             return None
     
     async def update_job_progress(self, job_id: str, percentage: int, message: str) -> bool:
-        """
-        Update job progress (for Phase 2 progress updates)
-        
-        Args:
-            job_id: ID of the job to update
-            percentage: Progress percentage (0-100)
-            message: Progress message
-            
-        Returns:
-            bool: True if successful, False otherwise
-        """
         status_data = {
             "jobStatus": "CreatingProduct",
             "progressPercentage": percentage,

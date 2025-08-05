@@ -54,7 +54,7 @@ class TTSService:
         self.audio_config = texttospeech.AudioConfig(
             audio_encoding=texttospeech.AudioEncoding.MP3,
             speaking_rate=voice_config.get('speakingRate', 1.1),
-            sample_rate_hertz=22050  # Lower sample rate for faster processing
+            sample_rate_hertz=22050 
         )
     
     def synthesize_text(self, text: str, output_path: Optional[str] = None) -> str:
@@ -69,7 +69,7 @@ class TTSService:
         else:
             # Ensure output directory exists
             output_dir = os.path.dirname(output_path)
-            if output_dir:  # Only create directory if it's not empty
+            if output_dir:
                 os.makedirs(output_dir, exist_ok=True)
         
         # Normalize path for Windows compatibility
@@ -81,7 +81,6 @@ class TTSService:
             # Prepare synthesis input
             synthesis_input = texttospeech.SynthesisInput(text=text)
             
-            # Call Google Cloud TTS API
             response = self.tts_client.synthesize_speech(
                 input=synthesis_input,
                 voice=self.voice,
@@ -110,17 +109,6 @@ class TTSService:
             raise
     
     async def generate_audio(self, text: str, output_path: str) -> str:
-        """
-        Generate audio from text (async wrapper for synchronous method)
-        
-        Args:
-            text: Text to convert to speech
-            output_path: Path to save the audio file
-            
-        Returns:
-            str: Path to the generated audio file
-        """
-        # Run the synchronous method in a thread pool
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(None, self.synthesize_text, text, output_path)
     
@@ -152,7 +140,7 @@ class TTSService:
             return 0.0
         
         # Average speaking rates adjusted for Vietnamese and our speaking rate setting
-        base_wpm = 150  # Base words per minute
+        base_wpm = 180 
         adjusted_wpm = base_wpm * self.audio_config.speaking_rate
         
         # Count words (approximate for Vietnamese)

@@ -4,7 +4,6 @@ Worker configuration for AI processing
 import os
 import tempfile
 from dataclasses import dataclass
-from typing import Optional
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -14,11 +13,11 @@ class WorkerConfig:
     """Configuration for AI worker"""
     
     # RabbitMQ Configuration  
-    rabbitmq_uri: str = os.getenv("RABBITMQ_URI", "amqp://eduva:eduva2025@localhost:56791")
+    rabbitmq_uri: str = os.getenv("RABBITMQ_URI", "amqp://eduva:eduva2025@localhost:5672")
     
     # Queue Configuration - Simple setup
     ai_task_queue: str = os.getenv("QUEUE_NAME", "ai_queue")
-    main_exchange: str = os.getenv("EXCHANGE_NAME", "ai_exchange")
+    main_exchange: str = os.getenv("EXCHANGE_NAME", "eduva_exchange")
     routing_key: str = os.getenv("ROUTING_KEY", "ai.task")
     dlq_queue: str = os.getenv("DLQ_QUEUE", "eduva.dlq")
     dlq_exchange: str = os.getenv("DLQ_EXCHANGE", "eduva.dlq.exchange")

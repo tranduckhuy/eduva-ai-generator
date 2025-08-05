@@ -4,9 +4,8 @@ Azure Blob Storage service for file upload/download operations
 import os
 import asyncio
 import tempfile
-from typing import Optional, BinaryIO, Dict, Any
-from azure.storage.blob import BlobServiceClient, BlobClient
-from azure.core.exceptions import AzureError
+from typing import Optional
+from azure.storage.blob import BlobServiceClient
 from src.utils.logger import logger
 
 
@@ -20,18 +19,6 @@ class AzureBlobService:
         
     async def upload_file(self, container_name: str, blob_name: str, file_path: str, 
                          content_type: Optional[str] = None) -> str:
-        """
-        Upload a file to Azure Blob Storage
-        
-        Args:
-            container_name: Name of the container
-            blob_name: Name of the blob (file name in storage)
-            file_path: Local path to the file to upload
-            content_type: MIME type of the file
-            
-        Returns:
-            str: URL of the uploaded blob
-        """
         try:
             # Ensure container exists
             await self._ensure_container_exists(container_name)
@@ -63,17 +50,6 @@ class AzureBlobService:
             self, container_name: str, 
             blob_name: str,
             local_path: Optional[str] = None) -> str:
-        """
-        Download a file from Azure Blob Storage
-        
-        Args:
-            container_name: Name of the container
-            blob_name: Name of the blob
-            local_path: Local path to save the file (optional)
-            
-        Returns:
-            str: Local path to the downloaded file
-        """
         try:
             # Create local path if not provided
             if local_path is None:
@@ -102,18 +78,6 @@ class AzureBlobService:
     
     async def upload_content(self, container_name: str, blob_name: str, content: bytes,
                             content_type: Optional[str] = None) -> str:
-        """
-        Upload content directly to Azure Blob Storage
-        
-        Args:
-            container_name: Name of the container
-            blob_name: Name of the blob
-            content: Content to upload as bytes
-            content_type: MIME type of the content
-            
-        Returns:
-            str: URL of the uploaded blob
-        """
         try:
             # Ensure container exists
             await self._ensure_container_exists(container_name)

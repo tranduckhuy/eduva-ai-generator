@@ -35,8 +35,6 @@ class ProductCreationHandler(BaseTaskHandler):
         product_blob_name = None
         
         try:
-            logger.info(f"Starting product creation for job {job_id}")
-            
             workspace_dir = os.path.join(self.config.temp_dir, f"product_job_{job_id}_{uuid.uuid4().hex[:8]}")
             os.makedirs(workspace_dir, exist_ok=True)
             logger.info(f"Created unique job directory: {workspace_dir}")

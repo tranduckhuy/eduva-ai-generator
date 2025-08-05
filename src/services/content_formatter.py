@@ -1,7 +1,6 @@
 """
 Content formatting utilities for video generation
 """
-from typing import List
 from src.utils.logger import logger
 
 class ContentFormatter:

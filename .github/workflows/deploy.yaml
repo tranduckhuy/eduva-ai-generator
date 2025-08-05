@@ -39,7 +39,6 @@ jobs:
           GOOGLE_API_KEY=${{ secrets.GOOGLE_API_KEY }}
           DEFAULT_MODEL=${{ secrets.DEFAULT_MODEL }}
           PREFETCH_COUNT=${{ secrets.CONTENT_PREFETCH_COUNT }}
-          IMAGE_TAG=${{ steps.version.outputs.version }}
           EOF
 
       - name: Transfer files to VPS 1
@@ -104,7 +103,6 @@ jobs:
           IMAGE_GENERATION_MODEL=${{ secrets.IMAGE_GENERATION_MODEL }}
           UNSPLASH_ACCESS_KEY=${{ secrets.UNSPLASH_ACCESS_KEY }}
           PREFETCH_COUNT=${{ secrets.PRODUCT_PREFETCH_COUNT }}
-          IMAGE_TAG=${{ steps.version.outputs.version }}
           EOF
 
       - name: Transfer files to VPS 2

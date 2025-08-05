@@ -178,7 +178,6 @@ class BaseTaskHandler(ABC):
             # Clean up temp file
             os.unlink(local_path)
             
-            logger.info(f"Downloaded JSON content from temp storage: {blob_name}")
             return content
             
         except Exception as e:

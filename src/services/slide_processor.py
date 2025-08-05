@@ -3,7 +3,7 @@ Slide processing utilities for video generation
 """
 import os
 import uuid
-from typing import List, Dict, Any
+from typing import Dict, Any
 from .image_generator import ImageGenerator
 from .content_formatter import ContentFormatter
 from src.utils.logger import logger
@@ -15,7 +15,7 @@ class SlideProcessor:
         self.image_generator = ImageGenerator(unsplash_access_key)
         self.content_formatter = ContentFormatter()
     
-    def process_slide_images(self, slide: Dict[str, Any], temp_dir: str, slide_id: int, image_resolution: tuple = (1280, 720)) -> Dict[str, Any]:
+    def process_slide_images(self, slide: Dict[str, Any], temp_dir: str, slide_id: int, image_resolution: tuple = (1280, 720), add_disclaimer: bool = False) -> Dict[str, Any]:
         """
         Process all images for a slide
         """
@@ -25,9 +25,9 @@ class SlideProcessor:
         tts_script = slide.get('tts_script', '')
         temp_dir = os.path.normpath(temp_dir)
 
-        if len(content) > 8:
-            content = content[:8]
-            logger.warning(f"Slide {slide_id} content truncated from {len(slide.get('content', []))} to 8 elements")
+        if len(content) > 10:
+            content = content[:10]
+            logger.warning(f"Slide {slide_id} content truncated from {len(slide.get('content', []))} to 10 elements")
 
         # Calculate content duration for display
         content_duration = self.content_formatter.calculate_content_display_duration(tts_script)
@@ -38,21 +38,23 @@ class SlideProcessor:
             'total_images': 0
         }
 
-        # 1. Create main content image with diverse templates
+        # 1. Create main content image with smart template selection
         content_image_path = os.path.normpath(os.path.join(temp_dir, f"content_{slide_id}.jpg"))
         try:
-            # Cycle template for variety each slide uses a different template
-            if slide_id > 1:
-                self.image_generator.template_manager.cycle_template()
+            # Smart template selection based on slide position and content type
+            content_type = "normal"  # You can make this dynamic based on slide content
             
-            self.image_generator.create_content_image(title, content, content_image_path, image_resolution)
+            self.image_generator.create_content_image(
+                title, content, content_image_path, image_resolution, 
+                content_type, add_disclaimer, slide_id
+            )
+            
             if os.path.exists(content_image_path):
                 result['images'].append({
                     'path': content_image_path,
                     'type': 'content',
                     'duration': content_duration
                 })
-                logger.info(f"✨ Created content image with template: {self.image_generator.template_manager.current_template}")
         except Exception as e:
             logger.warning(f"Content image creation failed for slide {slide_id}: {e}")
         
@@ -77,10 +79,10 @@ class SlideProcessor:
         # 2. Get up to 1 Unsplash image (optimized)
         if not generated_image_path and keywords and len(result['images']) < 2:
             try:
-                image_url = self.image_generator.get_single_unsplash_image_fast(keywords[1])
+                image_url = self.image_generator.get_unsplash_image_url(keywords[1])
                 if image_url:
                     image_path = os.path.join(temp_dir, f"unsplash_{slide_id}_{uuid.uuid4().hex[:8]}.jpg")
-                    downloaded_path = self.image_generator.download_single_image_fast(image_url, image_path, image_resolution)
+                    downloaded_path = self.image_generator.download_and_resize_image(image_url, image_path, image_resolution)
                     if downloaded_path and os.path.exists(downloaded_path):
                         result['images'].append({
                             'path': downloaded_path,
@@ -95,7 +97,7 @@ class SlideProcessor:
             logger.warning(f"No images could be created for slide {slide_id}, creating fallback")
             try:
                 fallback_path = os.path.normpath(os.path.join(temp_dir, f"fallback_{slide_id}.jpg"))
-                created_path = self.image_generator.create_simple_fallback(title or f"Slide {slide_id}", fallback_path, image_resolution)
+                created_path = self.image_generator.create_fallback_image(title or f"Slide {slide_id}", fallback_path, image_resolution)
                 if created_path and os.path.exists(created_path):
                     result['images'].append({
                         'path': created_path,
@@ -113,7 +115,6 @@ class SlideProcessor:
             logger.error(f"Critical error: No images could be created for slide {slide_id}")
             raise ValueError(f"Failed to create any images for slide {slide_id}")
         result['total_images'] = len(result['images'])
-        logger.info(f"⚡ Slide {slide_id} processed: {result['total_images']} images in fast mode")
         return result
     
     def calculate_slide_timing(self, slide_result: Dict[str, Any], audio_duration: float) -> Dict[str, Any]:
@@ -142,7 +143,7 @@ class SlideProcessor:
                 if img['type'] == 'content':
                     img['duration'] = content_time
                 else:
-                    img['duration'] = max(1.5, time_per_other_image)  # Minimum 1.5s per image
+                    img['duration'] = max(1.5, time_per_other_image) 
         else:
             # Only content image or no other images, use full duration
             # Safely handle the case where images list might be empty
@@ -168,3 +169,12 @@ class SlideProcessor:
             logger.debug(f"Slide timing calculated: 0 images, total: {audio_duration:.1f}s")
         
         return slide_result
+    
+    def reset_for_new_video(self):
+        """Reset for new video generation"""
+        self.image_generator.reset_for_new_video()
+        logger.info("SlideProcessor reset for new video")
+    
+    def set_template_preference(self, template_name: str) -> bool:
+        """Set user template preference"""
+        return self.image_generator.set_user_template_preference(template_name)
