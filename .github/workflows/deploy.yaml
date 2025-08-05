@@ -41,6 +41,15 @@ jobs:
           PREFETCH_COUNT=${{ secrets.CONTENT_PREFETCH_COUNT }}
           EOF
 
+      - name: Prepare VPS 1 directories
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.VPS1_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            mkdir -p ~/eduva-ai-content
+
       - name: Transfer files to VPS 1
         uses: appleboy/scp-action@master
         with:
@@ -48,7 +57,7 @@ jobs:
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           source: "docker-compose.content.yaml,.env.content"
-          target: "/opt/eduva-ai-content/"
+          target: "~/eduva-ai-content/"
 
       - name: Deploy Content Worker to VPS 1
         uses: appleboy/ssh-action@master
@@ -58,7 +67,7 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             # Navigate to deployment directory
-            cd /opt/eduva-ai-content
+            cd ~/eduva-ai-content
 
             # Login to GitHub Container Registry
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
@@ -105,6 +114,15 @@ jobs:
           PREFETCH_COUNT=${{ secrets.PRODUCT_PREFETCH_COUNT }}
           EOF
 
+      - name: Prepare VPS 2 directories
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.VPS2_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            mkdir -p ~/eduva-ai-product
+
       - name: Transfer files to VPS 2
         uses: appleboy/scp-action@master
         with:
@@ -112,7 +130,7 @@ jobs:
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           source: "docker-compose.product.yaml,.env.product"
-          target: "/opt/eduva-ai-product/"
+          target: "~/eduva-ai-product/"
 
       - name: Deploy Product Worker to VPS 2
         uses: appleboy/ssh-action@master
@@ -121,7 +139,7 @@ jobs:
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            cd /opt/eduva-ai-product
+            cd ~/eduva-ai-product
 
             # Login to GitHub Container Registry
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
