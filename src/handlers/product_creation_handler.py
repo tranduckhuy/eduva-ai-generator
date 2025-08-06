@@ -66,8 +66,10 @@ class ProductCreationHandler(BaseTaskHandler):
             video_output_blob_name = product_blob_name if message.jobType == JobType.VIDEO_LESSON else None
             audio_output_blob_name = product_blob_name if message.jobType == JobType.AUDIO_LESSON else None
 
+            lesson_info = lesson_content.get("lesson_info", {})
             # Step 4: Notify backend of success
             success_data = {
+                "title": lesson_info.get("title", "Untitled Lesson"),
                 "videoOutputBlobName": video_output_blob_name,
                 "audioOutputBlobName": audio_output_blob_name,
                 "actualDuration": duration_seconds,

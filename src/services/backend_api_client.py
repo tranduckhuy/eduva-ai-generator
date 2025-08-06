@@ -71,6 +71,7 @@ class BackendApiClient:
     async def update_job_success(self, job_id: str, status: JobStatus, **kwargs) -> bool:
         status_data = {
             "jobStatus": status.value,
+            "title": kwargs.get("title"),
             "wordCount": kwargs.get("wordCount"),
             "previewContent": kwargs.get("previewContent"),
             "contentBlobName": kwargs.get("contentBlobName"),

@@ -83,6 +83,7 @@ class ContentGenerationHandler(BaseTaskHandler):
             
             # Step 6: Notify backend of success
             success_data = {
+                "title": lesson_info.get("title", "Untitled Lesson"),
                 "wordCount": word_count,
                 "contentBlobName": content_blob_name,
                 "previewContent": preview_content,
