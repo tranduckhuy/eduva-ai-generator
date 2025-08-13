@@ -72,6 +72,7 @@ class BackendApiClient:
         status_data = {
             "jobStatus": status.value,
             "title": kwargs.get("title"),
+            "language": kwargs.get("language"),
             "wordCount": kwargs.get("wordCount"),
             "previewContent": kwargs.get("previewContent"),
             "contentBlobName": kwargs.get("contentBlobName"),

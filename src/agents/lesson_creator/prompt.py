@@ -43,6 +43,8 @@ Hãy tạo một bộ slide bài giảng dựa trên các thông tin sau:
 3. Số lượng slide nên từ 5 đến 12, tùy thuộc vào độ phức tạp của chủ đề và thông tin trong file.
 4. Phải có slide cuối cùng với tiêu đề là "Tổng kết" hoặc "Kết luận".
 5. Nội dung phải **Chính xác tuyệt đối 100%** với các thông tin **(tên, ngày tháng, sự kiện)** từ file upload, nếu không có thông tin thì không được bịa đặt.
+6. **Không được sử dụng bất kỳ ký tự đặc biệt nào** trong tiêu đề slide, nội dung hoặc kịch bản giọng nói (`tts_script`).
+**Tiêu đề Slide**: Phải ngắn gọn, dễ hiểu. **Tuyệt đối không lấy các chỉ mục (ví dụ: "1.1.1.") từ file gốc.**
 
 #### **B. Định dạng `content[]`**
 1.  **GIỚI HẠN KÉP (QUAN TRỌNG):**

@@ -28,7 +28,7 @@ async def test_optimized_performance():
     
     try:
         video_generator = VideoGenerator()
-        video_generator.slide_processor.image_generator.template_manager.set_user_preference("elegant_card")
+        video_generator.slide_processor.image_generator.template_manager.set_user_preference("modern_blue")
 
         base_dir = os.path.dirname(os.path.abspath(__file__))
         output_dir = os.path.join(base_dir, "temp_videos")

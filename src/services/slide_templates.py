@@ -75,7 +75,18 @@ class ModernBlueTemplate(SlideTemplate):
             b = int(42 + alpha * 100)  # 42-142
             draw.line([(0, y), (size[0], y)], fill=(r, g, b))
         
-        # Accent shapes
+        line_spacing = 80
+        line_color = '#1e3a8a'
+        line_width = 1
+        
+        for i in range(-size[1], size[0], line_spacing):
+            start_x = i
+            start_y = 0
+            end_x = i + size[1]
+            end_y = size[1]
+            draw.line([(start_x, start_y), (end_x, end_y)], fill=line_color, width=line_width)
+        
+        # Accent shapes (keep existing)
         draw.ellipse([size[0]-200, -100, size[0]+100, 200], fill='#1e40af', outline=None)
         draw.rectangle([0, size[1]-80, size[0], size[1]], fill='#1e3a8a')
         
@@ -121,10 +132,14 @@ class MinimalGreenTemplate(SlideTemplate):
         img = Image.new('RGB', size, color='#f8fafc')  # Very light gray
         draw = ImageDraw.Draw(img)
 
-        # Subtle pattern background
-        for x in range(0, size[0], 60):
-            for y in range(0, size[1], 60):
-                draw.rectangle([x, y, x + 1, y + 1], fill='#e2e8f0')
+        grid_size = 50
+        dot_color = '#d1d5db'
+        dot_radius = 1
+        
+        # Draw dots at grid intersections
+        for x in range(0, size[0], grid_size):
+            for y in range(0, size[1], grid_size):
+                draw.ellipse([x-dot_radius, y-dot_radius, x+dot_radius, y+dot_radius], fill=dot_color)
 
         # Header band - increase height
         header_height = 120
@@ -284,6 +299,15 @@ class CleanWhiteTemplate(SlideTemplate):
         img = Image.new('RGB', size, color='#ffffff')  # Pure white background
         draw = ImageDraw.Draw(img)
         
+        grid_size = 40
+        grid_color = '#f5f5f5'
+        
+        for x in range(0, size[0], grid_size):
+            draw.line([(x, 0), (x, size[1])], fill=grid_color, width=1)
+        
+        for y in range(0, size[1], grid_size):
+            draw.line([(0, y), (size[0], y)], fill=grid_color, width=1)
+        
         # Subtle light gray footer/header
         draw.rectangle([0, 0, size[0], 20], fill='#e0e0e0')
         draw.rectangle([0, size[1]-20, size[0], size[1]], fill='#e0e0e0')
@@ -320,12 +344,12 @@ class CleanWhiteTemplate(SlideTemplate):
                     bullet_y_offset = 10 # Fine-tune this
                     # Using a square bullet for a clean look
                     draw.rectangle([x-18, content_y + bullet_y_offset, x-8, content_y + bullet_y_offset + 10], fill='#4285F4')
-                    x += 30 # Space for bullet
+                    x += 15
                 else:
-                    x += 30 # Indent for wrapped lines or child content
+                    x += 15
                 draw.text((x, content_y), line, font=content_font, fill='#555555') # Medium gray text
-                content_y += 40 # Line spacing for content
-            content_y += 15 # Spacing between content items
+                content_y += 40
+            content_y += 15
 
 
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
@@ -374,9 +398,9 @@ class BlueAccentTemplate(SlideTemplate):
                     bullet_y_offset = 8
                     # Using a filled circle as bullet point
                     draw.ellipse([x-20, content_y + bullet_y_offset, x-10, content_y + bullet_y_offset + 10], fill='#3B82F6')
-                    x += 30
+                    x += 15
                 else:
-                    x += 30
+                    x += 15
                 draw.text((x, content_y), line, font=content_font, fill='#E2E8F0')
                 content_y += 38
             content_y += 12
@@ -393,7 +417,7 @@ class GeometricAccentTemplate(SlideTemplate):
         draw = ImageDraw.Draw(img)
         
         # Large triangle accent in top-left
-        draw.polygon([(0, 0), (size[0] // 3, 0), (0, size[1] // 3)], fill='#EF4444') # Red accent
+        draw.polygon([(0, 0), (size[0] // 4, 0), (0, size[1] // 4)], fill='#EF4444') # Red accent
         
         # Smaller square/rectangle accent in bottom-right
         draw.rectangle([size[0] - 150, size[1] - 150, size[0], size[1]], fill='#F59E0B') # Orange accent
@@ -417,7 +441,7 @@ class GeometricAccentTemplate(SlideTemplate):
         
         # Content
         content_y = y + 40  # Reduced gap between title and content
-        margin = 80
+        margin = 100
         for i, content_item in enumerate(contents):
             content_lines = self.wrap_text(draw, content_item, content_font, size[0] - margin*2 - 40)
             is_child_content = content_item.startswith('- ')
@@ -426,16 +450,15 @@ class GeometricAccentTemplate(SlideTemplate):
                     break
                 x = margin
                 if j == 0 and not is_child_content:
-                    bullet_y_offset = 10 # Fine-tune
-                    # Using a filled triangle as bullet point
+                    bullet_y_offset = 10
                     draw.polygon([
                         (x-20, content_y + bullet_y_offset),
                         (x-10, content_y + bullet_y_offset + 5),
                         (x-20, content_y + bullet_y_offset + 10)
                     ], fill='#3B82F6')
-                    x += 30
+                    x += 15
                 else:
-                    x += 30
+                    x += 15
                 draw.text((x, content_y), line, font=content_font, fill='#4B5563') # Darker gray text
                 content_y += 40
             content_y += 15
@@ -474,7 +497,7 @@ class NatureGreenTemplate(SlideTemplate):
         # Content rendering
         content_y = y + 35
         margin = 80
-        bullet_color = '#10B981'  # Emerald green
+        bullet_color = '#10B981' 
 
         for content_item in contents:
             content_lines = self.wrap_text(draw, content_item, content_font, size[0] - margin * 2 - 40)
@@ -487,8 +510,8 @@ class NatureGreenTemplate(SlideTemplate):
                 x = margin + (30 if is_child_content else 0)
 
                 if j == 0 and not is_child_content:
-                    # Modern bullet point
-                    draw.text((x - 25, content_y), "●", font=content_font, fill=bullet_color)
+                    # Use smaller bullet like FocusBlockEducationTemplate
+                    draw.text((x - 25, content_y), "•", font=content_font, fill=bullet_color)
 
                 draw.text((x, content_y), line, font=content_font, fill='#065F46')  # Slightly darker green
                 content_y += 40
@@ -549,8 +572,7 @@ class ModernQuestionSlideTemplate(SlideTemplate):
                 text_x = margin_left + (20 if is_child_content else 0)
 
                 if not is_child_content:
-                    # Draw dot for main item
-                    draw.text((margin_left - 25, y_text), "●", font=content_font, fill=bullet_color)
+                    draw.text((margin_left - 25, y_text), "•", font=content_font, fill=bullet_color)
                     
                 # Draw first line
                 draw.text((text_x, y_text), content_lines[0], font=content_font, fill='#111827')
@@ -564,7 +586,7 @@ class ModernQuestionSlideTemplate(SlideTemplate):
             y_text += 15  # Extra spacing
 
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
-        img.save(output_path, 'PNG', quality=95)
+        img.save(output_path, 'JPEG', quality=95)
         return output_path
 
 class ElegantCardTemplate(SlideTemplate):
@@ -629,22 +651,27 @@ class ElegantCardTemplate(SlideTemplate):
         if estimated_height > available_height:
             line_spacing = max(28, line_spacing - 4)
 
-        for item in contents:
-            lines = self.wrap_text(draw, item, content_font, max_text_width)
-            for i, line in enumerate(lines):
+        for content_item in contents:
+            content_lines = self.wrap_text(draw, content_item, content_font, max_text_width)
+            is_child_content = content_item.startswith('- ')
+
+            for j, line in enumerate(content_lines):
                 if content_y > card_y2 - 30:
                     break
-                if i == 0:
+                x = content_x
+                if j == 0 and not is_child_content:
                     bx = content_x - 20
                     by = content_y + 10
                     draw.ellipse([bx, by, bx + bullet_radius * 2, by + bullet_radius * 2], fill=ACCENT_COLOR)
+                elif is_child_content:
+                    x += 20
                 
-                draw.text((content_x, content_y), line, font=content_font, fill=TEXT_SECONDARY_COLOR)
+                draw.text((x, content_y), line, font=content_font, fill=TEXT_SECONDARY_COLOR)
                 content_y += line_spacing
             content_y += 10
 
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
-        img.save(output_path, 'PNG', quality=95)
+        img.save(output_path, 'JPEG', quality=95)
         return output_path
 
 class ModernEduTemplate(SlideTemplate):
@@ -693,7 +720,7 @@ class ModernEduTemplate(SlideTemplate):
             content_y += 10
 
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
-        img.save(output_path, 'PNG', quality=95)
+        img.save(output_path, 'JPEG', quality=95)
         return output_path
     
 class FocusBlockEducationTemplate(SlideTemplate):
@@ -720,9 +747,6 @@ class FocusBlockEducationTemplate(SlideTemplate):
             draw.text((40, y), line, font=title_font, fill='#ffffff')
             y += 44
 
-        # Optional: Add visual icon
-        # draw.ellipse((block_width - 80, height - 80, block_width - 20, height - 20), fill='#80cbc4')
-
         # Right content block
         margin_x = block_width + 40
         content_y = 80
@@ -739,7 +763,7 @@ class FocusBlockEducationTemplate(SlideTemplate):
             content_y += 10
 
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
-        img.save(output_path, "PNG", quality=95)
+        img.save(output_path, "JPEG", quality=95)
         return output_path
 
 class SlideTemplateManager:
@@ -847,14 +871,11 @@ class SlideTemplateManager:
     
     def create_slide_image(self, title: str, contents: List[str], output_path: str, 
                           size: tuple = (1280, 720), content_type: str = "normal", 
-                          add_disclaimer: bool = False, slide_id: int = None) -> str:
+                          add_disclaimer: bool = False, slide_id: int = None, language: str = "vietnamese") -> str:
         """Main method to create slide image with smart template selection"""
         
-        # For concurrent processing, use slide_id to determine if this is first slide
-        # instead of relying on slide_counter which can have race conditions
         is_first_slide = (slide_id == 1) if slide_id is not None else (self.slide_counter == 0)
         
-        # Auto-select template based on content type
         self.select_next_template(content_type)
         
         # Create image
@@ -864,11 +885,11 @@ class SlideTemplateManager:
         # Add disclaimer for first slide - use slide_id for thread safety
         if add_disclaimer and is_first_slide:
             logger.info(f"Adding disclaimer to slide {slide_id or 'first'}...")
-            result_path = self._add_disclaimer(result_path, size)
+            result_path = self._add_disclaimer(result_path, size, language)
         
         return result_path
-    
-    def _add_disclaimer(self, image_path: str, size: tuple) -> str:
+
+    def _add_disclaimer(self, image_path: str, size: tuple, language: str = "vietnamese") -> str:
         """Add disclaimer to slide image"""
         try:
             img = Image.open(image_path)
@@ -903,8 +924,11 @@ class SlideTemplateManager:
                 logger.warning(f"Font loading failed: {font_error}")
                 font = ImageFont.load_default()
             
-            disclaimer_text = "Hình ảnh trong video mang tính minh họa"
-            
+            if language == "vietnamese":
+                disclaimer_text = "Hình ảnh trong video mang tính minh họa"
+            else:
+                disclaimer_text = "Images shown are for illustrative purposes only."
+
             # Calculate position (bottom-right with more margin)
             bbox = draw.textbbox((0, 0), disclaimer_text, font=font)
             text_width, text_height = bbox[2] - bbox[0], bbox[3] - bbox[1]
@@ -946,8 +970,6 @@ class SlideTemplateManager:
         except Exception as e:
             logger.error(f"❌ Failed to add disclaimer: {e}", exc_info=True)
             return image_path
-        
-        return image_path
     
     def reset_for_new_video(self):
         """Reset state for new video generation"""

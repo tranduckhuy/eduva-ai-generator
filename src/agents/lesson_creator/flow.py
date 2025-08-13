@@ -20,7 +20,6 @@ async def run_slide_creator(
         prompt = create_prompt_template()
         llm = get_llm(model_name)
         logger.info(f"Generating slides with {model_name}...")
-
         structured_llm = llm.with_structured_output(SlideDeck)
 
         chain = prompt | structured_llm

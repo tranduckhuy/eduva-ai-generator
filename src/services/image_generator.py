@@ -42,10 +42,10 @@ class ImageGenerator:
     # Core functionality
     def create_content_image(self, title: str, contents: List[str], output_path: str, 
                            size: tuple = (1280, 720), content_type: str = "normal", 
-                           add_disclaimer: bool = False, slide_id: Optional[int] = None) -> str:
+                           add_disclaimer: bool = False, slide_id: Optional[int] = None, language: str = "vietnamese") -> str:
         """Create content slide image with smart template selection"""
         return self.template_manager.create_slide_image(
-            title, contents, output_path, size, content_type, add_disclaimer, slide_id
+            title, contents, output_path, size, content_type, add_disclaimer, slide_id, language
         )
     
     def reset_for_new_video(self) -> None:

@@ -19,7 +19,7 @@ from .tts_service import TTSService
 from src.utils.logger import logger
 
 class VideoGenerator:
-    def __init__(self, unsplash_access_key: str = None, voice_config: Dict[str, Any] = None):
+    def __init__(self, unsplash_access_key: str = None, voice_config: Dict[str, Any] = None, language: str = "vietnamese"):
         # Initialize TTS service
         self.tts_service = TTSService(voice_config)
         
@@ -39,6 +39,8 @@ class VideoGenerator:
         # Initialize helper classes
         self.slide_processor = SlideProcessor(self.unsplash_access_key)
         self.content_formatter = ContentFormatter()
+
+        self.language = language
 
     @contextmanager
     def _safe_moviepy_context(self):
@@ -204,7 +206,7 @@ class VideoGenerator:
             is_first_slide = (slide_id == 1)
             
             slide_result = self.slide_processor.process_slide_images(
-                slide, slide_temp_dir, slide_id, self.image_resolution, add_disclaimer=is_first_slide
+                slide, slide_temp_dir, slide_id, self.image_resolution, add_disclaimer=is_first_slide, language=self.language
             )
             
             # Calculate optimal timing for images based on audio duration

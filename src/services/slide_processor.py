@@ -15,7 +15,8 @@ class SlideProcessor:
         self.image_generator = ImageGenerator(unsplash_access_key)
         self.content_formatter = ContentFormatter()
     
-    def process_slide_images(self, slide: Dict[str, Any], temp_dir: str, slide_id: int, image_resolution: tuple = (1280, 720), add_disclaimer: bool = False) -> Dict[str, Any]:
+    def process_slide_images(self, slide: Dict[str, Any], temp_dir: str, slide_id: int, image_resolution: tuple = (1280, 720),
+                             add_disclaimer: bool = False, language: str = "vietnamese") -> Dict[str, Any]:
         """
         Process all images for a slide
         """
@@ -46,7 +47,7 @@ class SlideProcessor:
             
             self.image_generator.create_content_image(
                 title, content, content_image_path, image_resolution, 
-                content_type, add_disclaimer, slide_id
+                content_type, add_disclaimer, slide_id, language
             )
             
             if os.path.exists(content_image_path):

@@ -13,6 +13,7 @@ from src.agents.lesson_creator.flow import run_slide_creator
 from src.config.job_status import JobStatus
 from src.services.simple_document_processor import SimpleDocumentProcessor
 from src.utils.logger import logger
+from src.utils.helper import normalize_language
 
 
 class ContentGenerationHandler(BaseTaskHandler):
@@ -75,6 +76,13 @@ class ContentGenerationHandler(BaseTaskHandler):
             # Step 4: Calculate metrics
             lesson_info = lesson_content.get("lesson_info", {})
             word_count = lesson_info.get("total_words", 0)
+
+            # Normalize language to standardized format
+            raw_language = lesson_info.get("language", "vietnamese")
+            normalized_language = normalize_language(raw_language)
+
+            logger.info(f"Normalized language: {normalized_language}, Word count: {word_count}")
+            lesson_content["lesson_info"]["language"] = normalized_language
             
             # Step 5: Upload content to Azure
             content_blob_name = f"jobs/output/content_{job_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
@@ -84,6 +92,7 @@ class ContentGenerationHandler(BaseTaskHandler):
             # Step 6: Notify backend of success
             success_data = {
                 "title": lesson_info.get("title", "Untitled Lesson"),
+                "language": normalized_language,
                 "wordCount": word_count,
                 "contentBlobName": content_blob_name,
                 "previewContent": preview_content,
@@ -98,7 +107,7 @@ class ContentGenerationHandler(BaseTaskHandler):
             if not success:
                 raise Exception("Failed to notify backend of successful content generation")
             
-            logger.info(f"Successfully completed content generation for job {job_id}")
+            logger.info(f"Successfully completed content generation for job {job_id}, language: {normalized_language}")
             return True
         
         except asyncio.CancelledError:

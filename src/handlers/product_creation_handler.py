@@ -16,6 +16,7 @@ from src.utils.temp_cleanup import force_cleanup_workspace
 from src.services.tts_service import TTSService
 from src.services.tts_service import TTSService
 from moviepy.editor import concatenate_audioclips, AudioFileClip, VideoFileClip
+from src.utils.helper import normalize_language
 
 class ProductCreationHandler(BaseTaskHandler):
     """Handler for create_product tasks"""
@@ -45,8 +46,12 @@ class ProductCreationHandler(BaseTaskHandler):
             
             # Step 2: Generate product based on job type
             logger.info(f"Generating {message.jobType} product")
+            lesson_info = lesson_content.get("lesson_info", {})
+
+            language = normalize_language(lesson_info.get("language", "vietnamese"))
+
             local_product_file = await self._generate_product(
-                message, lesson_content, workspace_dir
+                message, lesson_content, workspace_dir, language=language
             )
 
             duration_seconds = None
@@ -66,7 +71,6 @@ class ProductCreationHandler(BaseTaskHandler):
             video_output_blob_name = product_blob_name if message.jobType == JobType.VIDEO_LESSON else None
             audio_output_blob_name = product_blob_name if message.jobType == JobType.AUDIO_LESSON else None
 
-            lesson_info = lesson_content.get("lesson_info", {})
             # Step 4: Notify backend of success
             success_data = {
                 "title": lesson_info.get("title", "Untitled Lesson"),
@@ -115,7 +119,8 @@ class ProductCreationHandler(BaseTaskHandler):
         self, 
         message: CreateProductMessage, 
         lesson_content: Dict[str, Any],
-        workspace_dir: str
+        workspace_dir: str,
+        language: str = "vietnamese"
     ) -> str:
         """
         Generate the final product based on job type
@@ -129,7 +134,7 @@ class ProductCreationHandler(BaseTaskHandler):
         """
         try:
             if message.jobType == JobType.VIDEO_LESSON:
-                return await self._generate_video(message, lesson_content, workspace_dir)
+                return await self._generate_video(message, lesson_content, workspace_dir, language=language)
             elif message.jobType == JobType.AUDIO_LESSON:
                 return await self._generate_audio(message, lesson_content, workspace_dir)
             else:
@@ -143,7 +148,8 @@ class ProductCreationHandler(BaseTaskHandler):
         self, 
         message: CreateProductMessage, 
         lesson_content: Dict[str, Any],
-        workspace_dir: str
+        workspace_dir: str,
+        language: str = "vietnamese"
     ) -> str:
         """
         Generate video from lesson content
@@ -173,9 +179,9 @@ class ProductCreationHandler(BaseTaskHandler):
 
             # Initialize video generator
             logger.info(f"Voice config for video generation: {voice_config}")
+        
+            video_generator = VideoGenerator(voice_config=voice_config, language=language)
 
-            video_generator = VideoGenerator(voice_config=voice_config)
-            
             # Generate output path
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
 
