@@ -67,7 +67,7 @@ class SlideProcessor:
             generated_image_path = self.image_generator.generate_ai_image(
                 prompt=ai_prompt,
                 output_path=image_path,
-                aspect_ratio="16:9"
+                aspect_ratio="16:9",
             )
 
             if generated_image_path:
@@ -123,14 +123,13 @@ class SlideProcessor:
         Calculate optimal timing for slide images based on content and audio duration
         """
         images = slide_result['images']
-        content_duration = slide_result['content_duration']
         
         if not images:
             logger.warning("No images found for timing calculation")
             return slide_result
         
         # Ensure content image gets 80% of total audio time for comfortable reading
-        content_time = audio_duration * 0.80  # 80% of total time for content slide
+        content_time = audio_duration * 0.80 
         
         # Calculate remaining time for other images
         remaining_time = audio_duration - content_time

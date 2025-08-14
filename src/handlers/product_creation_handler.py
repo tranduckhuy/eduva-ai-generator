@@ -56,10 +56,8 @@ class ProductCreationHandler(BaseTaskHandler):
 
             duration_seconds = None
             if message.jobType == JobType.VIDEO_LESSON:
-                # Log video duration
                 duration_seconds = self.get_video_duration(local_product_file)
             elif message.jobType == JobType.AUDIO_LESSON:
-                # Log audio duration
                 duration_seconds = self.get_audio_duration(local_product_file)
             logger.info(f"Product duration: {duration_seconds} seconds")
 
@@ -162,17 +160,12 @@ class ProductCreationHandler(BaseTaskHandler):
             str: Path to the generated video file
         """
         try:
-            # Prepare voice configuration
-            voice_config = message.voiceConfig or {}
-
-            # Set default voice config if not provided
-            if not voice_config:
-                voice_config = {
-                    "languageCode": "vi-VN",
-                    "name": "vi-VN-Neural2-A",
-                    "speakingRate": 1.1
-                }
-
+            voice_config = message.voiceConfig or {
+                "languageCode": "vi-VN",
+                "name": "vi-VN-Neural2-A",
+                "speakingRate": 1.1
+            }
+            
             # Ensure speaking rate is at least 1.0
             if voice_config.get("speakingRate", 1.0) < 1.1:
                 voice_config["speakingRate"] = 1.1
@@ -221,9 +214,13 @@ class ProductCreationHandler(BaseTaskHandler):
             voice_config = message.voiceConfig or {
                 "languageCode": "vi-VN",
                 "name": "vi-VN-Neural2-A",
-                "speakingRate": 1.0
+                "speakingRate": 1.1
             }
-
+            
+            # Ensure speaking rate is at least 1.0
+            if voice_config.get("speakingRate", 1.0) < 1.1:
+                voice_config["speakingRate"] = 1.1
+            
             tts_service = TTSService(voice_config)
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
 
@@ -246,7 +243,7 @@ class ProductCreationHandler(BaseTaskHandler):
 
                 text_bytes = len(text.encode('utf-8'))
                 
-                if current_size + text_bytes > 5000:
+                if current_size + text_bytes > 3000:
                     if current_chunk:
                         chunks.append(". ".join(current_chunk))
                     current_chunk = [text]

@@ -1,134 +1,121 @@
 # Environment Setup Guide
 
-## 1. Google Cloud Text-to-Speech Setup
+This guide helps you configure environment variables for both Content Worker and Product Worker. Please refer to the provided `.env.content.example` and `.env.product.example` files for the most up-to-date variable lists.
 
-### Bước 1: Tạo Google Cloud Project và Service Account
+---
 
-1. **Tạo Google Cloud Project**:
-   - Truy cập [Google Cloud Console](https://console.cloud.google.com/)
-   - Tạo project mới hoặc chọn project hiện có
-   - Ghi nhớ PROJECT_ID
+## 1. Google Cloud Text-to-Speech Setup (Product Worker)
 
-2. **Enable Cloud Text-to-Speech API**:
-   - Trong Google Cloud Console, đi tới "APIs & Services" > "Library"
-   - Tìm "Cloud Text-to-Speech API" và enable nó
+### Step 1: Create Google Cloud Project and Service Account
 
-3. **Tạo Service Account**:
-   - Đi tới "IAM & Admin" > "Service Accounts"
+1. **Create a Google Cloud Project:**
+
+   - Go to [Google Cloud Console](https://console.cloud.google.com/)
+   - Create a new project or select an existing one
+   - Note your `PROJECT_ID`
+
+2. **Enable Cloud Text-to-Speech API:**
+
+   - In the Console, navigate to "APIs & Services" > "Library"
+   - Search for "Cloud Text-to-Speech API" and enable it
+
+3. **Create a Service Account:**
+   - Go to "IAM & Admin" > "Service Accounts"
    - Click "CREATE SERVICE ACCOUNT"
-   - Nhập tên service account (vd: `video-generator-sa`)
-   - Gán role: "Cloud Text-to-Speech Admin" hoặc "Cloud Text-to-Speech User"
-   - Tạo và download JSON key file
+   - Enter a name (e.g., `video-generator-sa`)
+   - Assign the role: "Cloud Text-to-Speech User"
+   - Create and download the JSON key file
 
-### Bước 2: Cấu hình Environment Variables
+### Step 2: Configure Environment Variables
 
 **Windows (PowerShell):**
+
 ```powershell
-# Set Google Cloud credentials
 $env:GOOGLE_APPLICATION_CREDENTIALS="C:\path\to\your\service-account-key.json"
-
-# Optional: Unsplash API key for images
-$env:UNSPLASH_ACCESS_KEY="your_unsplash_access_key"
-
-# Verify
-echo $env:GOOGLE_APPLICATION_CREDENTIALS
-```
-
-**Windows (Command Prompt):**
-```cmd
-set GOOGLE_APPLICATION_CREDENTIALS=C:\path\to\your\service-account-key.json
-set UNSPLASH_ACCESS_KEY=your_unsplash_access_key
+$env:GOOGLE_CLOUD_PROJECT="your_project_id"
+$env:GOOGLE_CLOUD_LOCATION="us-central1"
+$env:UNSPLASH_ACCESS_KEY="your_unsplash_access_key"  # Optional
 ```
 
 **macOS/Linux:**
+
 ```bash
 export GOOGLE_APPLICATION_CREDENTIALS="/path/to/your/service-account-key.json"
-export UNSPLASH_ACCESS_KEY="your_unsplash_access_key"
+export GOOGLE_CLOUD_PROJECT="your_project_id"
+export GOOGLE_CLOUD_LOCATION="us-central1"
+export UNSPLASH_ACCESS_KEY="your_unsplash_access_key"  # Optional
 ```
 
-### Bước 3: Tạo .env file (Recommended)
+### Step 3: Create .env File
 
-Tạo file `.env` trong root project:
+Create a `.env.product` file in the project root (see `.env.product.example`):
+
 ```env
-# Google Cloud TTS (Required)
-GOOGLE_APPLICATION_CREDENTIALS=C:\path\to\your\service-account-key.json
-
-# Unsplash API (Optional - for better images)
+RABBITMQ_URI=amqp://guest:guest@your-rabbitmq-server:5672/
+QUEUE_NAME=eduva.product.queue
+EXCHANGE_NAME=eduva_exchange
+ROUTING_KEY=eduva.product.routing_key
+AZURE_STORAGE_CONNECTION_STRING=your_azure_connection_string
+AZURE_INPUT_CONTAINER=eduva-temp-storage
+AZURE_OUTPUT_CONTAINER=eduva-storage
+BACKEND_API_BASE_URL=https://localhost:9001
+BACKEND_API_KEY=your_api_key_here
+GOOGLE_APPLICATION_CREDENTIALS=C:/path/to/your/service-account-key.json
+GOOGLE_CLOUD_PROJECT=your_project_id
+GOOGLE_CLOUD_LOCATION=us-central1
+IMAGE_GENERATION_MODEL=imagen-3.0-fast-generate-001
 UNSPLASH_ACCESS_KEY=your_unsplash_access_key
-
-# Optional: Other configs
-PYTHONPATH=.
+WORKER_ID=product-worker-001
+MAX_CONCURRENT_TASKS=2
+PREFETCH_COUNT=2
 ```
 
-**Lưu ý**: Thêm `.env` vào `.gitignore` để không commit credentials!
+---
 
-## 2. Unsplash API Setup (Optional)
+## 2. Content Worker Environment Setup
 
-1. **Tạo Unsplash Developer Account**:
-   - Truy cập [Unsplash Developers](https://unsplash.com/developers)
-   - Đăng ký account và tạo application
-   - Lấy Access Key
+Create a `.env.content` file in the project root (see `.env.content.example`):
 
-2. **Cấu hình**:
-   - Thêm `UNSPLASH_ACCESS_KEY` vào environment variables
-   - Nếu không có, hệ thống sẽ tạo placeholder images
-
-## 3. Verify Setup
-
-Chạy script kiểm tra:
-```python
-import os
-from google.cloud import texttospeech
-
-# Check Google Cloud credentials
-print("Google Cloud credentials:", os.getenv('GOOGLE_APPLICATION_CREDENTIALS'))
-
-# Test TTS client
-try:
-    client = texttospeech.TextToSpeechClient()
-    voices = client.list_voices()
-    print(f"✅ Google Cloud TTS: Found {len(voices.voices)} voices")
-except Exception as e:
-    print(f"❌ Google Cloud TTS Error: {e}")
-
-# Check Unsplash (optional)
-unsplash_key = os.getenv('UNSPLASH_ACCESS_KEY')
-if unsplash_key:
-    print(f"✅ Unsplash API key configured")
-else:
-    print("⚠️ Unsplash API key not found (will use placeholder images)")
+```env
+RABBITMQ_URI=amqp://guest:guest@your-rabbitmq-server:5672/
+QUEUE_NAME=eduva.content.queue
+EXCHANGE_NAME=eduva_exchange
+ROUTING_KEY=eduva.content.routing_key
+AZURE_STORAGE_CONNECTION_STRING=your_azure_connection_string
+AZURE_INPUT_CONTAINER=eduva-temp-storage
+AZURE_OUTPUT_CONTAINER=eduva-storage
+BACKEND_API_BASE_URL=https://localhost:9001
+BACKEND_API_KEY=your_api_key_here
+GOOGLE_API_KEY=your_google_api_key
+DEFAULT_MODEL=gemini-2.5-flash-lite-preview-06-17
+PREFETCH_COUNT=4
 ```
 
-## 4. Troubleshooting
+---
 
-### Google Cloud Authentication Errors:
-- **Error**: "Could not automatically determine credentials"
-  - **Solution**: Đảm bảo `GOOGLE_APPLICATION_CREDENTIALS` đúng đường dẫn
-  - **Check**: File JSON có tồn tại và có quyền read
+## 3. Additional Notes
 
-- **Error**: "Permission denied"
-  - **Solution**: Service account cần role "Cloud Text-to-Speech User"
-  - **Check**: Verify IAM permissions trong Google Cloud Console
+- **Never commit your `.env` files or credentials to version control.**
+- For local development, you can use PowerShell, Command Prompt, or Bash to set environment variables temporarily.
+- For production, use Docker Compose environment or cloud secret managers.
+- If you do not provide `UNSPLASH_ACCESS_KEY`, the system will use placeholder images.
 
-### Import Errors:
-- **Error**: "No module named 'google.cloud'"
-  - **Solution**: `pip install google-cloud-texttospeech`
+---
 
-### Path Issues (Windows):
-- Sử dụng forward slashes: `C:/path/to/file.json`
-- Hoặc escape backslashes: `C:\\path\\to\\file.json`
-- Hoặc raw string: `r"C:\path\to\file.json"`
+## 5. Troubleshooting
 
-## 5. Production Recommendations
+- **Authentication errors:** Ensure `GOOGLE_APPLICATION_CREDENTIALS` points to a valid JSON key file and the service account has the correct role.
+- **Import errors:** Install dependencies with `pip install google-cloud-texttospeech`.
+- **Path issues (Windows):** Use forward slashes or double backslashes in paths.
 
-1. **Use Cloud Run/App Engine**: Tự động authenticate thông qua service account
-2. **Secret Manager**: Store credentials trong Google Secret Manager
-3. **Environment-specific configs**: Dev/staging/prod environments riêng
-4. **Monitoring**: Enable Cloud Logging để track TTS usage và costs
+---
 
-## 6. Cost Optimization
+## 6. Production Recommendations
 
-- **Standard voices**: Giá rẻ hơn Neural voices
-- **Caching**: Cache audio files để tránh tạo lại
-- **Batch processing**: Xử lý nhiều slides cùng lúc
-- **Monitoring**: Track TTS API usage qua Google Cloud Console
+- Use cloud secret managers for sensitive variables.
+- Separate environment files for dev/staging/prod.
+- Enable logging and monitoring for usage and cost tracking.
+
+---
+
+For more details, see the example environment files or contact the project maintainer.

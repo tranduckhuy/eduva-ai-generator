@@ -33,8 +33,8 @@ class VideoGenerator:
         # Performance optimizations
         self.max_workers_optimized = min(3, os.cpu_count())
         self.batch_size_optimized = 3
-        self.video_fps = 15  # Lower FPS for faster processing
-        self.image_resolution = (1280, 720)  # Standard HD
+        self.video_fps = 10
+        self.image_resolution = (1280, 720)
         
         # Initialize helper classes
         self.slide_processor = SlideProcessor(self.unsplash_access_key)
@@ -116,7 +116,6 @@ class VideoGenerator:
 
     async def _process_slides_concurrent(self, slides: List[Dict], temp_dir: str) -> List[str]:
         """Process slides with optimized memory usage and improved concurrency"""
-        # OPTIMIZED: Increased concurrency and larger batches
         max_workers = self.max_workers_optimized
         batch_size = self.batch_size_optimized
         
@@ -142,11 +141,10 @@ class VideoGenerator:
                     )
                     tasks.append(task)
                 
-                # Wait for batch to complete - OPTIMIZED timeout
                 try:
                     batch_results = await asyncio.wait_for(
                         asyncio.gather(*tasks, return_exceptions=True), 
-                        timeout=120
+                        timeout=300 
                     )
                     
                     # Process batch results
@@ -156,7 +154,6 @@ class VideoGenerator:
                         elif result:
                             all_valid_paths.append(result)
                     
-                    # OPTIMIZED: Minimal cleanup between batches
                     gc.collect()
                     time.sleep(0.2)
                     
@@ -168,200 +165,147 @@ class VideoGenerator:
             return all_valid_paths
 
     def _process_single_slide(self, slide: Dict, slide_index: int, temp_dir: str) -> str:
-        """Process a single slide: get images, generate TTS, create video"""
+        """Process a single slide: TTS -> Images -> Video"""
 
+        slide_id = int(slide.get('slide_id', slide_index + 1))
         slide_temp_dir = os.path.join(temp_dir, f"slide_{slide_index + 1}")
         os.makedirs(slide_temp_dir, exist_ok=True)
 
-        try:
-            slide_id = slide.get('slide_id', slide_index + 1)
-            
-            audio_path = os.path.join(slide_temp_dir, f"audio_{slide_id}_{uuid.uuid4().hex[:8]}.mp3")
-            video_path = os.path.join(slide_temp_dir, f"slide_{slide_id}_{uuid.uuid4().hex[:8]}.mp4")
-            
-            # Chuẩn hóa đường dẫn cho Windows để đảm bảo an toàn
-            audio_path = os.path.normpath(audio_path)
-            video_path = os.path.normpath(video_path)
+        audio_path = os.path.normpath(os.path.join(slide_temp_dir, f"audio_{slide_id}_{uuid.uuid4().hex[:8]}.mp3"))
+        video_path = os.path.normpath(os.path.join(slide_temp_dir, f"slide_{slide_id}_{uuid.uuid4().hex[:8]}.mp4"))
 
-            self._generate_tts_audio(
-                slide.get('tts_script', ''), 
-                audio_path
-            )
-            
-            # Get audio duration with proper cleanup
-            audio_duration = 5.0  # Default fallback
-            try:
-                with self._safe_moviepy_context() as clips:
-                    audio_clip = AudioFileClip(audio_path)
-                    clips.append(audio_clip)
-                    audio_duration = audio_clip.duration
-            except Exception as e:
-                logger.warning(f"Could not get audio duration for slide {slide_id}: {e}")
-            
-            # Optional cleanup between operations
-            gc.collect()
-            
-            # Process slide images using the optimized approach
-            # Add disclaimer for first slide (slide_id = 1, not slide_index)
+        try:
+            # 1. Generate TTS
+            self._generate_tts_audio(slide.get('tts_script', ''), audio_path)
+
+            # 2. Get audio duration
+            audio_duration = 5.0
+            if os.path.exists(audio_path):
+                try:
+                    with AudioFileClip(audio_path) as audio_clip:
+                        audio_duration = audio_clip.duration
+                except Exception as e:
+                    logger.warning(f"Could not get duration for slide {slide_id}: {e}")
+
+            # 3. Process slide images
             is_first_slide = (slide_id == 1)
-            
             slide_result = self.slide_processor.process_slide_images(
-                slide, slide_temp_dir, slide_id, self.image_resolution, add_disclaimer=is_first_slide, language=self.language
+                slide, slide_temp_dir, slide_id,
+                self.image_resolution,
+                add_disclaimer=is_first_slide,
+                language=self.language
             )
-            
-            # Calculate optimal timing for images based on audio duration
+
             slide_result = self.slide_processor.calculate_slide_timing(slide_result, audio_duration)
-            
-            # Another cleanup before video creation
-            gc.collect()
-            
-            # Create video for this slide with proper path handling
+
             self._create_slide_video_with_timing(slide_result, audio_path, video_path)
-            
-            # Final cleanup
-            gc.collect()
-            
-            # Verify the video file was created
+
             if not os.path.exists(video_path):
-                raise FileNotFoundError(f"Video file was not created: {video_path}")
-            
+                raise FileNotFoundError(f"Video file not created: {video_path}")
+
             return video_path
-            
+
         except Exception as e:
             logger.error(f"Error processing slide {slide_index + 1}: {e}")
             return None
 
     def _generate_tts_audio(self, text: str, output_path: str, silence_duration: float = 0.8) -> str:
-        if not text.strip():
+        text = text.strip()
+
+        if not text:
+            logger.debug(f"No text provided, creating silent audio at {output_path}")
             return self.tts_service.create_silent_audio(output_path, duration=2.0)
 
         try:
-            # Generate TTS audio first
             path = self.tts_service.synthesize_text(text, output_path)
 
-            # Add silence at the end if requested
-            if silence_duration > 0:
-                try:
-                    # Load original audio
-                    audio = AudioFileClip(path)
+            if silence_duration <= 0:
+                return path
+
+            try:
+                with AudioFileClip(path) as audio:
                     audio = audio_fadeout(audio, 0.02)
 
-                    # Create silence clip in memory - no file needed
-                    fps = 44100  # Standard sample rate
-                    channels = 2  # Stereo
+                    fps = 44100
+                    channels = 2 if audio.nchannels == 2 else 1
                     silence_samples = np.zeros((int(silence_duration * fps), channels), dtype=np.float32)
-                    silence = AudioArrayClip(silence_samples, fps=fps)
+                    silence_clip = AudioArrayClip(silence_samples, fps=fps)
 
-                    # Create temporary path for final audio to avoid overwriting during process
-                    temp_output = f"{os.path.splitext(path)[0]}_temp.mp3"
-                    
-                    # Concatenate audio with silence
-                    final = concatenate_audioclips([audio, silence])
-                    
-                    # Write to temporary file first
-                    final.write_audiofile(temp_output, codec="libmp3lame", logger=None, verbose=False)
+                    with silence_clip as silence:
+                        final_clip = concatenate_audioclips([audio, silence])
 
-                    # Close all clips to release resources
-                    audio.close()
-                    silence.close()
-                    final.close()
-                    
-                    # Replace original file with the new one
-                    if os.path.exists(temp_output):
-                        if os.path.exists(path):
-                            os.remove(path)
-                        os.rename(temp_output, path)
-                    
-                    logger.debug(f"Added {silence_duration}s silence to audio: {path}")
-                    
-                except Exception as silence_error:
-                    logger.warning(f"Could not add silence to audio: {silence_error}")
-                    # If silence addition fails, continue with original audio
+                        temp_output = f"{os.path.splitext(path)[0]}_temp.mp3"
+                        final_clip.write_audiofile(temp_output, codec="libmp3lame", logger=None, verbose=False)
 
-            return path
+                        final_clip.close()
+
+                os.replace(temp_output, path)
+                logger.debug(f"Added {silence_duration}s silence to audio: {path}")
+
+                return path
+
+            except Exception as silence_error:
+                logger.warning(f"Could not add silence to audio: {silence_error}")
+                return path
 
         except Exception as e:
             logger.error(f"TTS error: {e}")
             return self.tts_service.create_silent_audio(output_path, duration=3.0)
 
     def _create_slide_video_with_timing(self, slide_result: Dict[str, Any], audio_path: str, output_path: str):
-        """Create video from slide result with proper timing"""
-        # Validate and normalize paths for Windows
+        """Optimized video creation for slide with flexible image count."""
         output_path = os.path.normpath(os.path.abspath(output_path))
         audio_path = os.path.normpath(os.path.abspath(audio_path))
-        
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
-        
+
         with self._safe_moviepy_context() as clips:
             try:
-                # Load audio
                 audio_clip = AudioFileClip(audio_path)
                 clips.append(audio_clip)
                 total_duration = audio_clip.duration
-                
-                images = slide_result['images']
+
+                images = slide_result.get('images', [])
                 if not images:
-                    logger.error("No images provided for video creation - this should not happen")
                     raise ValueError("No images provided for video creation")
-                
-                # Create image clips with calculated durations
+
                 image_clips = []
-                
                 for img_info in images:
-                    image_path = os.path.normpath(os.path.abspath(img_info['path']))
-                    duration = img_info['duration']
-                    
-                    # Verify image file exists
-                    if not os.path.exists(image_path):
-                        logger.warning(f"Image file not found: {image_path}")
+                    img_path = os.path.normpath(os.path.abspath(img_info['path']))
+                    if not os.path.exists(img_path):
+                        logger.warning(f"Image file not found: {img_path}")
                         continue
                     
-                    # Create image clip with error handling - NO timing, just duration
                     try:
-                        image_clip = ImageClip(image_path).set_duration(duration)
-                        image_clips.append(image_clip)
-                        clips.append(image_clip)
+                        clip = (
+                            ImageClip(img_path)
+                            .resize(height=self.image_resolution[1])
+                            .set_duration(img_info['duration'])
+                            .set_fps(self.video_fps)
+                        )
+                        image_clips.append(clip)
+                        clips.append(clip)
                     except Exception as e:
-                        logger.warning(f"Could not create image clip for {image_path}: {e}")
-                        continue
-                
+                        logger.warning(f"Could not create image clip for {img_path}: {e}")
+
                 if not image_clips:
                     raise ValueError("No valid image clips could be created")
-                
-                # Create video by concatenating images instead of compositing
-                if len(image_clips) == 1:
-                    video_clip = image_clips[0]
-                else:
-                    # Concatenate images sequentially
-                    video_clip = concatenate_videoclips(image_clips, method="compose")
-                
+
+                video_clip = concatenate_videoclips(image_clips, method="compose")
+                video_clip = video_clip.set_audio(audio_clip)
                 clips.append(video_clip)
-                
-                # Ensure video duration matches audio duration
-                video_clip = video_clip.set_duration(total_duration)
-                
-                # Combine with audio
-                final_clip = video_clip.set_audio(audio_clip)
-                clips.append(final_clip)
-                
-                # Write video file with enhanced error handling - OPTIMIZED
-                try:
-                    self._safe_file_operation(
-                        final_clip.write_videofile,
-                        output_path,
-                        fps=self.video_fps,
-                        codec='libx264',
-                        audio_codec='aac',
-                        verbose=False,
-                        logger=None,
-                        preset='ultrafast',
-                        ffmpeg_params=['-crf', '28'],
-                        temp_audiofile=None
-                    )
-                except Exception as e:
-                    logger.error(f"Error writing video file: {e}")
-                    raise
-                
+
+                self._safe_file_operation(
+                    video_clip.write_videofile,
+                    output_path,
+                    fps=self.video_fps,
+                    codec='libx264',
+                    audio_codec='aac',
+                    verbose=False,
+                    logger=None,
+                    preset='medium',
+                    ffmpeg_params=['-crf', '23']
+                )
+
             except Exception as e:
                 logger.error(f"Error creating slide video: {e}")
                 raise

@@ -90,7 +90,6 @@ class RabbitMQManager:
         
         except asyncio.CancelledError:
             logger.info(f"Task for job {job_id} was cancelled during shutdown")
-            # Don't re-raise CancelledError - let it be handled gracefully
             return
             
         except Exception as e:

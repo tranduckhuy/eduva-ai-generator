@@ -77,7 +77,7 @@ class ImageGenerator:
                 prompt=prompt,
                 number_of_images=1,
                 aspect_ratio=aspect_ratio,
-                negative_prompt="text, watermark, blurry, low quality"
+                negative_prompt="watermark, blurry, low quality"
             )
             
             if images.images:

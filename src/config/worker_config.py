@@ -40,7 +40,7 @@ class WorkerConfig:
     
     # Worker Configuration
     worker_id: str = os.getenv("WORKER_ID", "ai-worker-001")
-    max_retries: int = int(os.getenv("MAX_RETRIES", "3"))
+    max_retries: int = int(os.getenv("MAX_RETRIES", "1"))
     retry_delay: int = int(os.getenv("RETRY_DELAY", "5"))
     
     # Dead Letter Queue Configuration

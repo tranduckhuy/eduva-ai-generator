@@ -11,6 +11,9 @@ from google.cloud import texttospeech
 from moviepy.editor import AudioClip
 import asyncio
 from src.utils.logger import logger
+from google.api_core.exceptions import ServiceUnavailable
+
+MAX_RETRIES = 5
 
 class TTSService:
     """Google Cloud Text-to-Speech Service"""
@@ -56,57 +59,56 @@ class TTSService:
             speaking_rate=voice_config.get('speakingRate', 1.1),
             sample_rate_hertz=22050 
         )
-    
+
     def synthesize_text(self, text: str, output_path: Optional[str] = None) -> str:
-        """Convert text to speech and save as audio file"""
+        """Convert text to speech and save as audio file with retry"""
         if not text or not text.strip():
             raise ValueError("Text cannot be empty")
-        
-        # Use temp file if no output path specified
+
         if output_path is None:
-            temp_fd, output_path = tempfile.mkstemp(suffix='.mp3', prefix='tts_')
-            os.close(temp_fd)
+            fd, output_path = tempfile.mkstemp(suffix='.mp3', prefix='tts_')
+            os.close(fd)
         else:
-            # Ensure output directory exists
             output_dir = os.path.dirname(output_path)
             if output_dir:
                 os.makedirs(output_dir, exist_ok=True)
-        
-        # Normalize path for Windows compatibility
+
         output_path = os.path.normpath(os.path.abspath(output_path))
-        
-        start_time = time.time()
-        
-        try:
-            # Prepare synthesis input
-            synthesis_input = texttospeech.SynthesisInput(text=text)
-            
-            response = self.tts_client.synthesize_speech(
-                input=synthesis_input,
-                voice=self.voice,
-                audio_config=self.audio_config
-            )
-            
-            # Write audio content to file
-            with open(output_path, "wb") as audio_file:
-                audio_file.write(response.audio_content)
-            
-            # Verify file was created
-            if not os.path.exists(output_path) or os.path.getsize(output_path) == 0:
-                raise Exception(f"Failed to create audio file: {output_path}")
-            
-            # Update performance metrics
-            duration = time.time() - start_time
-            self._call_count += 1
-            self._total_chars += len(text)
-            self._total_duration += duration
-            
-            logger.debug(f"TTS generated: {len(text)} chars in {duration:.2f}s -> {output_path}")
-            return output_path
-            
-        except Exception as e:
-            logger.error(f"TTS synthesis failed for text '{text[:50]}...': {e}")
-            raise
+        last_exc = None
+
+        for attempt in range(MAX_RETRIES):
+            start_time = time.time()
+            try:
+                response = self.tts_client.synthesize_speech(
+                    input=texttospeech.SynthesisInput(text=text),
+                    voice=self.voice,
+                    audio_config=self.audio_config
+                )
+
+                with open(output_path, "wb") as audio_file:
+                    audio_file.write(response.audio_content)
+
+                if not os.path.exists(output_path) or os.path.getsize(output_path) == 0:
+                    raise IOError(f"Failed to create audio file: {output_path}")
+
+                duration = time.time() - start_time
+                self._call_count += 1
+                self._total_chars += len(text)
+                self._total_duration += duration
+                logger.debug(f"TTS generated: {len(text)} chars in {duration:.2f}s -> {output_path}")
+                return output_path
+
+            except ServiceUnavailable as e:
+                last_exc = e
+                wait_time = 2 ** attempt
+                logger.warning(f"TTS API unavailable, retrying in {wait_time}s... (Attempt {attempt+1}/{MAX_RETRIES})")
+                time.sleep(wait_time)
+            except Exception as e:
+                last_exc = e
+                logger.error(f"TTS synthesis failed on attempt {attempt+1}: {e}")
+                break
+
+        raise last_exc
     
     async def generate_audio(self, text: str, output_path: str) -> str:
         loop = asyncio.get_event_loop()
