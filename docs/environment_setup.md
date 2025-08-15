@@ -4,51 +4,11 @@ This guide helps you configure environment variables for both Content Worker and
 
 ---
 
-## 1. Google Cloud Text-to-Speech Setup (Product Worker)
+## 1. Product Worker Environment Setup
 
-### Step 1: Create Google Cloud Project and Service Account
+### Step 2: Create .env File
 
-1. **Create a Google Cloud Project:**
-
-   - Go to [Google Cloud Console](https://console.cloud.google.com/)
-   - Create a new project or select an existing one
-   - Note your `PROJECT_ID`
-
-2. **Enable Cloud Text-to-Speech API:**
-
-   - In the Console, navigate to "APIs & Services" > "Library"
-   - Search for "Cloud Text-to-Speech API" and enable it
-
-3. **Create a Service Account:**
-   - Go to "IAM & Admin" > "Service Accounts"
-   - Click "CREATE SERVICE ACCOUNT"
-   - Enter a name (e.g., `video-generator-sa`)
-   - Assign the role: "Cloud Text-to-Speech User"
-   - Create and download the JSON key file
-
-### Step 2: Configure Environment Variables
-
-**Windows (PowerShell):**
-
-```powershell
-$env:GOOGLE_APPLICATION_CREDENTIALS="C:\path\to\your\service-account-key.json"
-$env:GOOGLE_CLOUD_PROJECT="your_project_id"
-$env:GOOGLE_CLOUD_LOCATION="us-central1"
-$env:UNSPLASH_ACCESS_KEY="your_unsplash_access_key"  # Optional
-```
-
-**macOS/Linux:**
-
-```bash
-export GOOGLE_APPLICATION_CREDENTIALS="/path/to/your/service-account-key.json"
-export GOOGLE_CLOUD_PROJECT="your_project_id"
-export GOOGLE_CLOUD_LOCATION="us-central1"
-export UNSPLASH_ACCESS_KEY="your_unsplash_access_key"  # Optional
-```
-
-### Step 3: Create .env File
-
-Create a `.env.product` file in the project root (see `.env.product.example`):
+Create a `.env.product.local` file in the project root (see `.env.product.example`):
 
 ```env
 RABBITMQ_URI=amqp://guest:guest@your-rabbitmq-server:5672/
@@ -74,7 +34,7 @@ PREFETCH_COUNT=2
 
 ## 2. Content Worker Environment Setup
 
-Create a `.env.content` file in the project root (see `.env.content.example`):
+Create a `.env.content.local` file in the project root (see `.env.content.example`):
 
 ```env
 RABBITMQ_URI=amqp://guest:guest@your-rabbitmq-server:5672/
@@ -90,32 +50,3 @@ GOOGLE_API_KEY=your_google_api_key
 DEFAULT_MODEL=gemini-2.5-flash-lite-preview-06-17
 PREFETCH_COUNT=4
 ```
-
----
-
-## 3. Additional Notes
-
-- **Never commit your `.env` files or credentials to version control.**
-- For local development, you can use PowerShell, Command Prompt, or Bash to set environment variables temporarily.
-- For production, use Docker Compose environment or cloud secret managers.
-- If you do not provide `UNSPLASH_ACCESS_KEY`, the system will use placeholder images.
-
----
-
-## 5. Troubleshooting
-
-- **Authentication errors:** Ensure `GOOGLE_APPLICATION_CREDENTIALS` points to a valid JSON key file and the service account has the correct role.
-- **Import errors:** Install dependencies with `pip install google-cloud-texttospeech`.
-- **Path issues (Windows):** Use forward slashes or double backslashes in paths.
-
----
-
-## 6. Production Recommendations
-
-- Use cloud secret managers for sensitive variables.
-- Separate environment files for dev/staging/prod.
-- Enable logging and monitoring for usage and cost tracking.
-
----
-
-For more details, see the example environment files or contact the project maintainer.

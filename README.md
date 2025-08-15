@@ -1,14 +1,16 @@
 # AI Worker Service
 
-AI Worker Service is an asynchronous task processing system that integrates with RabbitMQ, Azure Blob Storage, and provides callback support to a C# backend. It is designed for scalable content and product generation workflows, supporting both local development and production deployments via Docker.
+AI Worker Service automatically transforms input files into narrated audio and video lessons using AI, enabling fast and scalable lesson creation from documents.
 
 ## 🚀 Features
 
-- Asynchronous task processing via RabbitMQ
-- Integration with Azure Blob Storage for file management
-- Callback to backend API for task status and results
-- Modular architecture for content and product generation
-- Easy deployment: local or Docker
+- Automatically generates lesson content from input files using AI (text, audio, and video)
+- Converts documents into narrated audio and video lessons
+- Asynchronous task processing via RabbitMQ for scalability
+- Seamless integration with Azure Blob Storage for file management
+- Callback to backend API for real-time task status and results
+- Modular architecture for content and product (audio/video) generation
+- Easy deployment: local development or Docker production
 
 ## 📋 Prerequisites
 
@@ -16,16 +18,24 @@ AI Worker Service is an asynchronous task processing system that integrates with
 - RabbitMQ server (local or remote)
 - Azure Blob Storage account
 - Backend API endpoint (for callbacks)
-- (Optional) Google Cloud credentials for TTS
-- (Optional) OpenAI API key for content generation
+- Google Cloud credentials for TTS
+- Gemini API key for content generation
 
 ## ⚙️ Environment Setup
 
-1. Copy the example environment file and update it with your configuration:
+See [`docs/environment_setup.md`](docs/environment_setup.md) for detailed environment configuration, including all required and optional environment variables, credential setup, and troubleshooting tips.
+
+**Recommended:** Create separate environment files for each worker:
+
+- `.env.content.local` for Content Worker (see `.env.content.example`)
+- `.env.product.local` for Product Worker (see `.env.product.example`)
+
+1. Copy the example environment files and update them with your configuration:
 
    ```bash
-   cp .env.example .env
-   # Edit .env with your RabbitMQ, Azure, Backend API, and other credentials
+   cp .env.content.example .env.content.local
+   cp .env.product.example .env.product.local
+   # Edit the .env.*.local files with your RabbitMQ, Azure, Google, and API credentials
    ```
 
 2. Install dependencies:
@@ -54,26 +64,9 @@ docker-compose -f docker-compose.content.yaml up --build -d   # Content worker
 docker-compose -f docker-compose.product.yaml up --build -d   # Product worker
 ```
 
-## 🔑 Environment Variables
+## 🔑 Environment & Prerequisites
 
-**Required:**
-
-- `RABBITMQ_URI` - RabbitMQ connection URI
-- `AZURE_STORAGE_CONNECTION_STRING` - Azure Blob Storage connection string
-- `AZURE_INPUT_CONTAINER` - Azure Blob container for input files
-- `AZURE_OUTPUT_CONTAINER` - Azure Blob container for output files
-- `BACKEND_API_BASE_URL` - Backend API base URL for callbacks
-- `BACKEND_API_KEY` - Backend API key
-- `GOOGLE_API_KEY` - Google AI (Gemini) API key (if using Gemini)
-- `GOOGLE_APPLICATION_CREDENTIALS` - Path to Google TTS credentials JSON
-
-**Optional:**
-
-- `DEFAULT_MODEL` - Default Gemini model (default: gemini-2.0-flash-exp)
-- `WORKER_ID` - Worker identifier (default: auto-generated)
-- `MAX_CONCURRENT_TASKS` - Maximum concurrent tasks (default: 2)
-- `UNSPLASH_ACCESS_KEY` - Unsplash API key for image generation
-- `RABBITMQ_HOST` - RabbitMQ host (default: localhost)
+See [`docs/environment_setup.md`](docs/environment_setup.md) for detailed environment configuration and setup instructions, including all required and optional environment variables, credential setup, and troubleshooting tips.
 
 ## 📨 Supported Task Types
 
