@@ -17,6 +17,10 @@ from .content_formatter import ContentFormatter
 from .slide_processor import SlideProcessor
 from .tts_service import TTSService
 from src.utils.logger import logger
+from PIL import Image
+
+if not hasattr(Image, 'ANTIALIAS'):
+    Image.ANTIALIAS = Image.Resampling.LANCZOS
 
 class VideoGenerator:
     def __init__(self, unsplash_access_key: str = None, voice_config: Dict[str, Any] = None, language: str = "vietnamese"):
